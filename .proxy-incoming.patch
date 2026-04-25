@@ -1,252 +1,83 @@
-Subject: [PATCH] upload endpoint for mcp
+Subject: [PATCH] clear form
 ---
-Index: public/skill.md
+Index: public/index.html
 IDEA additional info:
 Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
 <+>UTF-8
 ===================================================================
-diff --git a/public/skill.md b/public/skill.md
---- a/public/skill.md	(revision 9b618eef8389ad9b59fb83439127ea5fdc67cafd)
-+++ b/public/skill.md	(date 1777143908597)
-@@ -20,11 +20,41 @@
- | Argument | Required | Format |
- |---|---|---|
- | `coordinate` | yes | `owner/name:branch` (single colon) |
--| `patch` | yes | Output of `git diff` or `git format-patch -1 --stdout` |
-+| `patch` | one of patch/patch_id | Output of `git diff` or `git format-patch -1 --stdout` (inline string) |
-+| `patch_id` | one of patch/patch_id | Id returned by `POST /uploads` (see "Large patches" below) |
- | `commit_message` | yes | One-line summary, optionally followed by blank line + body |
- | `author_name` | no | Defaults to the GitHub user that owns the PAT |
- | `author_email` | no | Defaults to the GitHub user that owns the PAT |
+diff --git a/public/index.html b/public/index.html
+--- a/public/index.html	(revision c766181b76ed7026158bec073d5afabf58dedb64)
++++ b/public/index.html	(date 1777144573591)
+@@ -70,7 +70,10 @@
+         </div>
+       </div>
  
-+Provide exactly one of `patch` or `patch_id` — never both, never neither.
-+
-+## Large patches: `patch_id` workflow
-+
-+Inline `patch` is convenient for tiny diffs but expensive for anything bigger: the AI agent has to emit the whole patch as a tool argument, which burns output tokens proportional to patch size and slows the call dramatically (a 24KB patch = ~6000 output tokens before the proxy even runs).
-+
-+For non-trivial patches, prefer the upload + id flow:
-+
-+1. **Upload the patch** to the proxy as raw text:
-+   ```sh
-+   curl -X POST https://<proxy-host>/uploads \
-+     -H "Authorization: Bearer <github-pat>" \
-+     --data-binary @my.patch
-+   ```
-+   Response: `{ "id": "<uuid>", "expiresAt": "<iso>" }`. The id is single-use and expires after ~10 minutes.
-+
-+2. **Call `apply_patch`** with `patch_id` instead of `patch`:
-+   ```json
-+   {
-+     "coordinate": "owner/name:branch",
-+     "patch_id": "<uuid>",
-+     "commit_message": "..."
-+   }
-+   ```
-+
-+The proxy resolves the id to the stored content and runs the same clone → apply → commit → push flow. The patch is consumed (deleted from the store) at lookup time, regardless of outcome — if `apply_patch` returns `needs_review` or `failed`, you must re-upload before retrying.
-+
-+If the id is unknown or already consumed/expired, the tool returns an error like `Upload "<id>" not found or expired.` — re-upload and try again.
-+
- ## Outcomes — interpret carefully
+-      <button type="submit" id="submit-btn">Apply patch</button>
++      <div class="actions-row">
++        <button type="submit" id="submit-btn">Apply patch</button>
++        <button type="button" id="reset-btn" hidden>Reset</button>
++      </div>
+     </form>
  
- ### `success`
-Index: src/uploadsStore.js
+     <section id="status" hidden>
+Index: public/style.css
 IDEA additional info:
 Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
 <+>UTF-8
 ===================================================================
-diff --git a/src/uploadsStore.js b/src/uploadsStore.js
-new file mode 100644
---- /dev/null	(date 1777143212306)
-+++ b/src/uploadsStore.js	(date 1777143212306)
-@@ -0,0 +1,23 @@
-+const { randomUUID } = require('node:crypto');
-+
-+const TTL_MS = 10 * 60 * 1000;
-+
-+const uploads = new Map();
-+
-+function createUpload(content) {
-+  const id = randomUUID();
-+  const expiresAt = new Date(Date.now() + TTL_MS);
-+  const timer = setTimeout(() => uploads.delete(id), TTL_MS).unref();
-+  uploads.set(id, { content, expiresAt, timer });
-+  return { id, expiresAt: expiresAt.toISOString() };
+diff --git a/public/style.css b/public/style.css
+--- a/public/style.css	(revision c766181b76ed7026158bec073d5afabf58dedb64)
++++ b/public/style.css	(date 1777144581712)
+@@ -289,6 +289,13 @@
+   color: inherit;
+ }
+ 
++.actions-row {
++  display: flex;
++  justify-content: space-between;
++  align-items: center;
++  gap: 0.5rem;
 +}
 +
-+function consumeUpload(id) {
-+  const entry = uploads.get(id);
-+  if (!entry) return null;
-+  clearTimeout(entry.timer);
-+  uploads.delete(id);
-+  return entry.content;
-+}
-+
-+module.exports = { createUpload, consumeUpload };
-Index: src/server.js
+ button:disabled {
+   opacity: 0.5;
+   cursor: progress;
+Index: public/app.js
 IDEA additional info:
 Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
 <+>UTF-8
 ===================================================================
-diff --git a/src/server.js b/src/server.js
---- a/src/server.js	(revision 9b618eef8389ad9b59fb83439127ea5fdc67cafd)
-+++ b/src/server.js	(date 1777143898316)
-@@ -2,6 +2,7 @@
- const path = require('node:path');
+diff --git a/public/app.js b/public/app.js
+--- a/public/app.js	(revision c766181b76ed7026158bec073d5afabf58dedb64)
++++ b/public/app.js	(date 1777144592179)
+@@ -9,6 +9,7 @@
+   const coordinateEl = document.getElementById('coordinate');
+   const commitMessageEl = document.getElementById('commit-message');
+   const submitBtn = document.getElementById('submit-btn');
++  const resetBtn = document.getElementById('reset-btn');
  
- const { createJob, getJob, finishJob } = require('./jobsStore');
-+const { createUpload, consumeUpload } = require('./uploadsStore');
- const { applyPatch } = require('./applyPatch');
- const { attachMcp } = require('./mcpServer');
+   const openCoordinatesBtn = document.getElementById('open-coordinates-dialog');
+   const coordinatesDialog = document.getElementById('coordinates-dialog');
+@@ -50,6 +51,7 @@
+   setupDropZone();
  
-@@ -12,6 +13,21 @@
+   form.addEventListener('submit', onSubmit);
++  resetBtn.addEventListener('click', resetAfterApply);
  
- attachMcp(app);
- 
-+app.post('/uploads', express.text({ limit: '10mb', type: '*/*' }), (req, res) => {
-+  const auth = req.get('authorization') || '';
-+  if (!/^Bearer\s+\S+$/i.test(auth)) {
-+    return res.status(401).json({ error: 'Missing Authorization: Bearer <token>' });
+   function setupDropZone() {
+     let depth = 0;
+@@ -441,6 +443,14 @@
+     statusLine.className = `status-${kind}`;
+     statusLine.textContent = line;
+     statusDetail.textContent = detail || '';
++    resetBtn.hidden = false;
 +  }
 +
-+  const body = typeof req.body === 'string' ? req.body : '';
-+  if (!body.trim()) {
-+    return res.status(400).json({ error: 'empty body: send the patch content as raw text (curl --data-binary @file.diff)' });
-+  }
-+
-+  const upload = createUpload(body);
-+  res.status(201).json(upload);
-+});
-+
- app.post('/jobs', (req, res) => {
-   const auth = req.get('authorization') || '';
-   const match = auth.match(/^Bearer\s+(.+)$/i);
-@@ -20,21 +36,36 @@
-   }
-   const token = match[1].trim();
- 
--  const { repo, branch, patch, commitMessage, author } = req.body ?? {};
--  if (typeof repo !== 'string' || typeof branch !== 'string' ||
--      typeof patch !== 'string' || typeof commitMessage !== 'string') {
--    return res.status(400).json({ error: 'required fields: repo, branch, patch, commitMessage' });
-+  const { repo, branch, patch, patchId, commitMessage, author } = req.body ?? {};
-+  if (typeof repo !== 'string' || typeof branch !== 'string' || typeof commitMessage !== 'string') {
-+    return res.status(400).json({ error: 'required fields: repo, branch, commitMessage' });
-   }
--  if (!repo || !branch || !patch || !commitMessage) {
-+  if (!repo || !branch || !commitMessage) {
-     return res.status(400).json({ error: 'fields cannot be empty' });
++  function resetAfterApply() {
++    commitMessageEl.value = '';
++    clearFile();
++    statusBox.hidden = true;
++    resetBtn.hidden = true;
    }
  
-+  const hasPatch = typeof patch === 'string' && patch.trim().length > 0;
-+  const hasPatchId = typeof patchId === 'string' && patchId.trim().length > 0;
-+  if (hasPatch === hasPatchId) {
-+    return res.status(400).json({ error: 'provide exactly one of: patch, patchId' });
-+  }
-+
-+  let resolvedPatch;
-+  if (hasPatchId) {
-+    resolvedPatch = consumeUpload(patchId.trim());
-+    if (resolvedPatch == null) {
-+      return res.status(410).json({ error: 'upload not found or expired' });
-+    }
-+  } else {
-+    resolvedPatch = patch;
-+  }
-+
-   const job = createJob();
-   res.status(202).json({ id: job.id });
- 
-   setImmediate(async () => {
-     try {
--      const outcome = await applyPatch({ token, repo, branch, patch, commitMessage, author });
-+      const outcome = await applyPatch({ token, repo, branch, patch: resolvedPatch, commitMessage, author });
-       finishJob(job.id, outcome.status, outcome.result);
-     } catch (err) {
-       finishJob(job.id, 'failed', { error: 'unexpected error', details: String(err?.message ?? err) });
-Index: src/mcpServer.js
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
-diff --git a/src/mcpServer.js b/src/mcpServer.js
---- a/src/mcpServer.js	(revision 9b618eef8389ad9b59fb83439127ea5fdc67cafd)
-+++ b/src/mcpServer.js	(date 1777143902622)
-@@ -10,6 +10,7 @@
- const path = require('node:path');
- 
- const { applyPatch } = require('./applyPatch');
-+const { consumeUpload } = require('./uploadsStore');
- 
- const REPO_RE = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
- const SKILL_RESOURCE_URI = 'github-proxy://skill.md';
-@@ -39,6 +40,7 @@
-         'Use it when the user has (or you can generate) a git patch and wants it landed on a GitHub branch without cloning locally.',
-         'Single or multi-file patches, including new files and renames, are supported.',
-         'Coordinate format is "owner/name:branch" (e.g. "octocat/hello-world:main").',
-+        'Provide the patch via EITHER "patch" (inline string) OR "patch_id" (id returned by POST /uploads). For non-trivial patches (more than a few KB) prefer "patch_id": upload the patch via "curl -X POST .../uploads -H \'Authorization: Bearer <pat>\' --data-binary @file.diff" and pass the returned id here. This avoids re-emitting the whole patch as a tool argument.',
-         'Three outcomes: "success" returns commit_sha + commit_url; "needs_review" means the patch does NOT apply cleanly (operation SKIPPED — do NOT retry blindly, surface the conflict reason and suggest manual resolution); "failed" returns the underlying error in result.details.',
-         'For edge cases, format tips, and detailed outcome handling, read the MCP resource "github-proxy://skill.md" via resources/read (or fetch the same content over HTTPS at "/skill.md" on this proxy host) before invoking the tool on non-trivial inputs.',
-       ].join(' '),
-@@ -51,7 +53,11 @@
-           },
-           patch: {
-             type: 'string',
--            description: "Git patch content (output of 'git diff' or 'git format-patch'). Applied via 'git apply --3way'.",
-+            description: "Git patch content (output of 'git diff' or 'git format-patch'). Applied via 'git apply --3way'. Mutually exclusive with patch_id.",
-+          },
-+          patch_id: {
-+            type: 'string',
-+            description: "Id returned by POST /uploads on this proxy. Single-use; expires after ~10 minutes. Mutually exclusive with patch.",
-           },
-           commit_message: {
-             type: 'string',
-@@ -66,7 +72,7 @@
-             description: 'Commit author email. Optional: see author_name.',
-           },
-         },
--        required: ['coordinate', 'patch', 'commit_message'],
-+        required: ['coordinate', 'commit_message'],
-         additionalProperties: false,
-       },
-     }],
-@@ -85,13 +91,26 @@
-     if (!parsed) {
-       return errorResult('Invalid coordinate. Expected format: owner/name:branch.');
-     }
--    if (typeof args.patch !== 'string' || !args.patch.trim()) {
--      return errorResult('Argument "patch" missing or empty.');
--    }
-     if (typeof args.commit_message !== 'string' || !args.commit_message.trim()) {
-       return errorResult('Argument "commit_message" missing or empty.');
-     }
- 
-+    const hasPatch = typeof args.patch === 'string' && args.patch.trim().length > 0;
-+    const hasPatchId = typeof args.patch_id === 'string' && args.patch_id.trim().length > 0;
-+    if (hasPatch === hasPatchId) {
-+      return errorResult('Provide exactly one of: "patch" (inline) or "patch_id" (from POST /uploads).');
-+    }
-+
-+    let patchContent;
-+    if (hasPatchId) {
-+      patchContent = consumeUpload(args.patch_id.trim());
-+      if (patchContent == null) {
-+        return errorResult(`Upload "${args.patch_id}" not found or expired. Upload the patch again via POST /uploads.`);
-+      }
-+    } else {
-+      patchContent = args.patch;
-+    }
-+
-     const author = (args.author_name && args.author_email)
-       ? { name: String(args.author_name), email: String(args.author_email) }
-       : undefined;
-@@ -100,7 +119,7 @@
-       token,
-       repo: parsed.repo,
-       branch: parsed.branch,
--      patch: args.patch,
-+      patch: patchContent,
-       commitMessage: args.commit_message,
-       author,
-     });
+   function sleep(ms) {

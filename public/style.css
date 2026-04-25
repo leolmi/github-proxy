@@ -289,6 +289,13 @@ button {
   color: inherit;
 }
 
+.actions-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 button:disabled {
   opacity: 0.5;
   cursor: progress;

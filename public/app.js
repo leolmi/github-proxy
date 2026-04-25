@@ -9,6 +9,7 @@
   const coordinateEl = document.getElementById('coordinate');
   const commitMessageEl = document.getElementById('commit-message');
   const submitBtn = document.getElementById('submit-btn');
+  const resetBtn = document.getElementById('reset-btn');
 
   const openCoordinatesBtn = document.getElementById('open-coordinates-dialog');
   const coordinatesDialog = document.getElementById('coordinates-dialog');
@@ -50,6 +51,7 @@
   setupDropZone();
 
   form.addEventListener('submit', onSubmit);
+  resetBtn.addEventListener('click', resetAfterApply);
 
   function setupDropZone() {
     let depth = 0;
@@ -441,6 +443,14 @@
     statusLine.className = `status-${kind}`;
     statusLine.textContent = line;
     statusDetail.textContent = detail || '';
+    resetBtn.hidden = false;
+  }
+
+  function resetAfterApply() {
+    commitMessageEl.value = '';
+    clearFile();
+    statusBox.hidden = true;
+    resetBtn.hidden = true;
   }
 
   function sleep(ms) {
