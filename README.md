@@ -40,7 +40,20 @@ Open `http://localhost:3000`.
 
 ## Heroku deployment
 
-`Procfile` and `engines.node` are already set up. Heroku ships `git` in its official stack and provides an ephemeral writable filesystem at `/tmp`, which is all the temporary clone needs.
+`Procfile`, `engines.node`, and `Aptfile` are already set up. The repo provides an ephemeral writable filesystem at `/tmp`, which is all the temporary clone needs.
+
+> ⚠️ Heroku runtime images do **not** ship with `git` by default — only the build phase has it. We install it at runtime via the `apt` buildpack and an `Aptfile` listing `git`.
+
+Buildpack setup (one-time, before the first deploy):
+
+```sh
+heroku buildpacks:add --index 1 https://github.com/heroku/heroku-buildpack-apt
+heroku buildpacks:add heroku/nodejs
+```
+
+The `apt` buildpack must run **before** `heroku/nodejs`. You can also configure this from the Heroku dashboard under *Settings → Buildpacks*, dragging the apt buildpack above nodejs.
+
+Then deploy:
 
 ```sh
 heroku create <app-name>
