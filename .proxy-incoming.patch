@@ -1,249 +1,252 @@
-Subject: [PATCH] PAT description
+Subject: [PATCH] upload endpoint for mcp
 ---
-Index: public/index.html
+Index: public/skill.md
 IDEA additional info:
 Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
 <+>UTF-8
 ===================================================================
-diff --git a/public/index.html b/public/index.html
---- a/public/index.html	(revision a900222432b2f2f5859243ef2bd108021927ccde)
-+++ b/public/index.html	(date 1777131208455)
-@@ -27,10 +27,19 @@
-     </p>
+diff --git a/public/skill.md b/public/skill.md
+--- a/public/skill.md	(revision 9b618eef8389ad9b59fb83439127ea5fdc67cafd)
++++ b/public/skill.md	(date 1777143908597)
+@@ -20,11 +20,41 @@
+ | Argument | Required | Format |
+ |---|---|---|
+ | `coordinate` | yes | `owner/name:branch` (single colon) |
+-| `patch` | yes | Output of `git diff` or `git format-patch -1 --stdout` |
++| `patch` | one of patch/patch_id | Output of `git diff` or `git format-patch -1 --stdout` (inline string) |
++| `patch_id` | one of patch/patch_id | Id returned by `POST /uploads` (see "Large patches" below) |
+ | `commit_message` | yes | One-line summary, optionally followed by blank line + body |
+ | `author_name` | no | Defaults to the GitHub user that owns the PAT |
+ | `author_email` | no | Defaults to the GitHub user that owns the PAT |
  
-     <form id="patch-form">
--      <label>
--        GitHub PAT
--        <input type="password" id="token" autocomplete="off" required />
--      </label>
-+      <div class="pat-field">
-+        <span>GitHub PAT</span>
-+        <div class="pat-row">
-+          <span class="pat-display is-empty" id="pat-display">(no PAT set)</span>
-+          <button type="button" id="open-pat-dialog" class="icon-button" aria-label="Edit PAT" title="Edit PAT">
-+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-+              <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor" />
-+            </svg>
-+          </button>
-+        </div>
-+        <input type="hidden" id="token" />
-+        <input type="hidden" id="pat-description" />
-+      </div>
- 
-       <label>
-         Coordinate (owner/name:branch)
-@@ -79,6 +88,22 @@
-         <button type="button" id="coordinates-confirm" disabled>Confirm</button>
-       </div>
-     </dialog>
++Provide exactly one of `patch` or `patch_id` — never both, never neither.
 +
-+    <dialog id="pat-dialog">
-+      <h2>GitHub PAT</h2>
-+      <label>
-+        Notes (memo, not sent anywhere)
-+        <input type="text" id="pat-dialog-description" placeholder="e.g. project-name, expires 2026-05-25" />
-+      </label>
-+      <label>
-+        Token
-+        <input type="password" id="pat-dialog-token" autocomplete="off" />
-+      </label>
-+      <div class="dialog-actions">
-+        <button type="button" id="pat-dialog-cancel">Cancel</button>
-+        <button type="button" id="pat-dialog-save">Save</button>
-+      </div>
-+    </dialog>
-   </main>
++## Large patches: `patch_id` workflow
++
++Inline `patch` is convenient for tiny diffs but expensive for anything bigger: the AI agent has to emit the whole patch as a tool argument, which burns output tokens proportional to patch size and slows the call dramatically (a 24KB patch = ~6000 output tokens before the proxy even runs).
++
++For non-trivial patches, prefer the upload + id flow:
++
++1. **Upload the patch** to the proxy as raw text:
++   ```sh
++   curl -X POST https://<proxy-host>/uploads \
++     -H "Authorization: Bearer <github-pat>" \
++     --data-binary @my.patch
++   ```
++   Response: `{ "id": "<uuid>", "expiresAt": "<iso>" }`. The id is single-use and expires after ~10 minutes.
++
++2. **Call `apply_patch`** with `patch_id` instead of `patch`:
++   ```json
++   {
++     "coordinate": "owner/name:branch",
++     "patch_id": "<uuid>",
++     "commit_message": "..."
++   }
++   ```
++
++The proxy resolves the id to the stored content and runs the same clone → apply → commit → push flow. The patch is consumed (deleted from the store) at lookup time, regardless of outcome — if `apply_patch` returns `needs_review` or `failed`, you must re-upload before retrying.
++
++If the id is unknown or already consumed/expired, the tool returns an error like `Upload "<id>" not found or expired.` — re-upload and try again.
++
+ ## Outcomes — interpret carefully
  
-   <script src="app.js"></script>
-Index: public/style.css
+ ### `success`
+Index: src/uploadsStore.js
 IDEA additional info:
 Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
 <+>UTF-8
 ===================================================================
-diff --git a/public/style.css b/public/style.css
---- a/public/style.css	(revision a900222432b2f2f5859243ef2bd108021927ccde)
-+++ b/public/style.css	(date 1777131025727)
-@@ -84,6 +84,73 @@
-   flex: 1;
- }
- 
-+.pat-field {
-+  display: flex;
-+  flex-direction: column;
-+  gap: 0.25rem;
-+  font-size: 0.9rem;
+diff --git a/src/uploadsStore.js b/src/uploadsStore.js
+new file mode 100644
+--- /dev/null	(date 1777143212306)
++++ b/src/uploadsStore.js	(date 1777143212306)
+@@ -0,0 +1,23 @@
++const { randomUUID } = require('node:crypto');
++
++const TTL_MS = 10 * 60 * 1000;
++
++const uploads = new Map();
++
++function createUpload(content) {
++  const id = randomUUID();
++  const expiresAt = new Date(Date.now() + TTL_MS);
++  const timer = setTimeout(() => uploads.delete(id), TTL_MS).unref();
++  uploads.set(id, { content, expiresAt, timer });
++  return { id, expiresAt: expiresAt.toISOString() };
 +}
 +
-+.pat-row {
-+  display: flex;
-+  gap: 0.5rem;
-+  align-items: stretch;
++function consumeUpload(id) {
++  const entry = uploads.get(id);
++  if (!entry) return null;
++  clearTimeout(entry.timer);
++  uploads.delete(id);
++  return entry.content;
 +}
 +
-+.pat-display {
-+  flex: 1;
-+  display: flex;
-+  align-items: center;
-+  padding: 0.45rem 0.55rem;
-+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
-+  border-radius: 4px;
-+  white-space: nowrap;
-+  overflow: hidden;
-+  text-overflow: ellipsis;
-+}
-+
-+.pat-display.is-empty {
-+  opacity: 0.55;
-+  font-style: italic;
-+}
-+
-+#pat-dialog {
-+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
-+  border-radius: 6px;
-+  padding: 1.1rem 1.2rem;
-+  max-width: 460px;
-+  width: calc(100% - 2rem);
-+  background: Canvas;
-+  color: CanvasText;
-+}
-+
-+#pat-dialog::backdrop {
-+  background: rgba(0, 0, 0, 0.4);
-+}
-+
-+#pat-dialog h2 {
-+  margin: 0 0 0.9rem;
-+  font-size: 1rem;
-+}
-+
-+#pat-dialog label {
-+  display: flex;
-+  flex-direction: column;
-+  gap: 0.25rem;
-+  margin-bottom: 0.8rem;
-+  font-size: 0.85rem;
-+}
-+
-+#pat-dialog input[type="text"],
-+#pat-dialog input[type="password"] {
-+  font: inherit;
-+  padding: 0.45rem 0.55rem;
-+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
-+  border-radius: 4px;
-+  background: transparent;
-+  color: inherit;
-+}
-+
- .icon-button {
-   display: inline-flex;
-   align-items: center;
-Index: public/app.js
++module.exports = { createUpload, consumeUpload };
+Index: src/server.js
 IDEA additional info:
 Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
 <+>UTF-8
 ===================================================================
-diff --git a/public/app.js b/public/app.js
---- a/public/app.js	(revision a900222432b2f2f5859243ef2bd108021927ccde)
-+++ b/public/app.js	(date 1777131042243)
-@@ -5,6 +5,7 @@
+diff --git a/src/server.js b/src/server.js
+--- a/src/server.js	(revision 9b618eef8389ad9b59fb83439127ea5fdc67cafd)
++++ b/src/server.js	(date 1777143898316)
+@@ -2,6 +2,7 @@
+ const path = require('node:path');
  
-   const form = document.getElementById('patch-form');
-   const tokenEl = document.getElementById('token');
-+  const patDescriptionEl = document.getElementById('pat-description');
-   const coordinateEl = document.getElementById('coordinate');
-   const commitMessageEl = document.getElementById('commit-message');
-   const submitBtn = document.getElementById('submit-btn');
-@@ -16,6 +17,14 @@
-   const coordinatesConfirmBtn = document.getElementById('coordinates-confirm');
-   const coordinatesCancelBtn = document.getElementById('coordinates-cancel');
+ const { createJob, getJob, finishJob } = require('./jobsStore');
++const { createUpload, consumeUpload } = require('./uploadsStore');
+ const { applyPatch } = require('./applyPatch');
+ const { attachMcp } = require('./mcpServer');
  
-+  const patDisplayEl = document.getElementById('pat-display');
-+  const openPatBtn = document.getElementById('open-pat-dialog');
-+  const patDialog = document.getElementById('pat-dialog');
-+  const patDialogDescriptionEl = document.getElementById('pat-dialog-description');
-+  const patDialogTokenEl = document.getElementById('pat-dialog-token');
-+  const patDialogSaveBtn = document.getElementById('pat-dialog-save');
-+  const patDialogCancelBtn = document.getElementById('pat-dialog-cancel');
+@@ -12,6 +13,21 @@
+ 
+ attachMcp(app);
+ 
++app.post('/uploads', express.text({ limit: '10mb', type: '*/*' }), (req, res) => {
++  const auth = req.get('authorization') || '';
++  if (!/^Bearer\s+\S+$/i.test(auth)) {
++    return res.status(401).json({ error: 'Missing Authorization: Bearer <token>' });
++  }
 +
-   let savedCoordinates = [];
-   let dialogSelectedIdx = -1;
++  const body = typeof req.body === 'string' ? req.body : '';
++  if (!body.trim()) {
++    return res.status(400).json({ error: 'empty body: send the patch content as raw text (curl --data-binary @file.diff)' });
++  }
++
++  const upload = createUpload(body);
++  res.status(201).json(upload);
++});
++
+ app.post('/jobs', (req, res) => {
+   const auth = req.get('authorization') || '';
+   const match = auth.match(/^Bearer\s+(.+)$/i);
+@@ -20,21 +36,36 @@
+   }
+   const token = match[1].trim();
  
-@@ -35,7 +44,9 @@
-   document.getElementById('mcp-endpoint').textContent = `${location.origin}/mcp`;
- 
-   loadSettings();
-+  updatePatDisplay();
-   setupCoordinatesDialog();
-+  setupPatDialog();
-   setupDropZone();
- 
-   form.addEventListener('submit', onSubmit);
-@@ -131,6 +142,7 @@
-       if (raw) {
-         const saved = JSON.parse(raw);
-         if (saved.token) tokenEl.value = saved.token;
-+        if (saved.description) patDescriptionEl.value = saved.description;
- 
-         if (Array.isArray(saved.coordinates)) {
-           savedCoordinates = saved.coordinates
-@@ -162,6 +174,7 @@
-     try {
-       localStorage.setItem(STORAGE_KEY, JSON.stringify({
-         token: tokenEl.value,
-+        description: patDescriptionEl.value,
-         coordinates: savedCoordinates,
-       }));
-     } catch (_) { /* quota exceeded, nothing to do */ }
-@@ -173,6 +186,41 @@
-     savedCoordinates.unshift(coord);
+-  const { repo, branch, patch, commitMessage, author } = req.body ?? {};
+-  if (typeof repo !== 'string' || typeof branch !== 'string' ||
+-      typeof patch !== 'string' || typeof commitMessage !== 'string') {
+-    return res.status(400).json({ error: 'required fields: repo, branch, patch, commitMessage' });
++  const { repo, branch, patch, patchId, commitMessage, author } = req.body ?? {};
++  if (typeof repo !== 'string' || typeof branch !== 'string' || typeof commitMessage !== 'string') {
++    return res.status(400).json({ error: 'required fields: repo, branch, commitMessage' });
+   }
+-  if (!repo || !branch || !patch || !commitMessage) {
++  if (!repo || !branch || !commitMessage) {
+     return res.status(400).json({ error: 'fields cannot be empty' });
    }
  
-+  function setupPatDialog() {
-+    openPatBtn.addEventListener('click', () => {
-+      patDialogDescriptionEl.value = patDescriptionEl.value;
-+      patDialogTokenEl.value = tokenEl.value;
-+      patDialog.showModal();
-+    });
-+
-+    patDialogCancelBtn.addEventListener('click', () => {
-+      patDialog.close();
-+    });
-+
-+    patDialogSaveBtn.addEventListener('click', () => {
-+      patDescriptionEl.value = patDialogDescriptionEl.value.trim();
-+      tokenEl.value = patDialogTokenEl.value.trim();
-+      updatePatDisplay();
-+      persistSettings();
-+      patDialog.close();
-+    });
++  const hasPatch = typeof patch === 'string' && patch.trim().length > 0;
++  const hasPatchId = typeof patchId === 'string' && patchId.trim().length > 0;
++  if (hasPatch === hasPatchId) {
++    return res.status(400).json({ error: 'provide exactly one of: patch, patchId' });
 +  }
 +
-+  function updatePatDisplay() {
-+    const desc = patDescriptionEl.value.trim();
-+    const hasToken = tokenEl.value.length > 0;
-+    if (!hasToken) {
-+      patDisplayEl.textContent = '(no PAT set)';
-+      patDisplayEl.classList.add('is-empty');
-+    } else if (desc) {
-+      patDisplayEl.textContent = desc;
-+      patDisplayEl.classList.remove('is-empty');
-+    } else {
-+      patDisplayEl.textContent = '(PAT set, no notes)';
-+      patDisplayEl.classList.add('is-empty');
++  let resolvedPatch;
++  if (hasPatchId) {
++    resolvedPatch = consumeUpload(patchId.trim());
++    if (resolvedPatch == null) {
++      return res.status(410).json({ error: 'upload not found or expired' });
 +    }
++  } else {
++    resolvedPatch = patch;
 +  }
 +
-   function setupCoordinatesDialog() {
-     openCoordinatesBtn.addEventListener('click', () => {
-       dialogSelectedIdx = -1;
-@@ -286,6 +334,10 @@
+   const job = createJob();
+   res.status(202).json({ id: job.id });
  
-   async function onSubmit(ev) {
-     ev.preventDefault();
-+    if (!tokenEl.value.trim()) {
-+      setStatus('failed', 'No GitHub PAT set', 'Click the edit icon to enter your PAT.');
-+      return;
+   setImmediate(async () => {
+     try {
+-      const outcome = await applyPatch({ token, repo, branch, patch, commitMessage, author });
++      const outcome = await applyPatch({ token, repo, branch, patch: resolvedPatch, commitMessage, author });
+       finishJob(job.id, outcome.status, outcome.result);
+     } catch (err) {
+       finishJob(job.id, 'failed', { error: 'unexpected error', details: String(err?.message ?? err) });
+Index: src/mcpServer.js
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/mcpServer.js b/src/mcpServer.js
+--- a/src/mcpServer.js	(revision 9b618eef8389ad9b59fb83439127ea5fdc67cafd)
++++ b/src/mcpServer.js	(date 1777143902622)
+@@ -10,6 +10,7 @@
+ const path = require('node:path');
+ 
+ const { applyPatch } = require('./applyPatch');
++const { consumeUpload } = require('./uploadsStore');
+ 
+ const REPO_RE = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
+ const SKILL_RESOURCE_URI = 'github-proxy://skill.md';
+@@ -39,6 +40,7 @@
+         'Use it when the user has (or you can generate) a git patch and wants it landed on a GitHub branch without cloning locally.',
+         'Single or multi-file patches, including new files and renames, are supported.',
+         'Coordinate format is "owner/name:branch" (e.g. "octocat/hello-world:main").',
++        'Provide the patch via EITHER "patch" (inline string) OR "patch_id" (id returned by POST /uploads). For non-trivial patches (more than a few KB) prefer "patch_id": upload the patch via "curl -X POST .../uploads -H \'Authorization: Bearer <pat>\' --data-binary @file.diff" and pass the returned id here. This avoids re-emitting the whole patch as a tool argument.',
+         'Three outcomes: "success" returns commit_sha + commit_url; "needs_review" means the patch does NOT apply cleanly (operation SKIPPED — do NOT retry blindly, surface the conflict reason and suggest manual resolution); "failed" returns the underlying error in result.details.',
+         'For edge cases, format tips, and detailed outcome handling, read the MCP resource "github-proxy://skill.md" via resources/read (or fetch the same content over HTTPS at "/skill.md" on this proxy host) before invoking the tool on non-trivial inputs.',
+       ].join(' '),
+@@ -51,7 +53,11 @@
+           },
+           patch: {
+             type: 'string',
+-            description: "Git patch content (output of 'git diff' or 'git format-patch'). Applied via 'git apply --3way'.",
++            description: "Git patch content (output of 'git diff' or 'git format-patch'). Applied via 'git apply --3way'. Mutually exclusive with patch_id.",
++          },
++          patch_id: {
++            type: 'string',
++            description: "Id returned by POST /uploads on this proxy. Single-use; expires after ~10 minutes. Mutually exclusive with patch.",
+           },
+           commit_message: {
+             type: 'string',
+@@ -66,7 +72,7 @@
+             description: 'Commit author email. Optional: see author_name.',
+           },
+         },
+-        required: ['coordinate', 'patch', 'commit_message'],
++        required: ['coordinate', 'commit_message'],
+         additionalProperties: false,
+       },
+     }],
+@@ -85,13 +91,26 @@
+     if (!parsed) {
+       return errorResult('Invalid coordinate. Expected format: owner/name:branch.');
+     }
+-    if (typeof args.patch !== 'string' || !args.patch.trim()) {
+-      return errorResult('Argument "patch" missing or empty.');
+-    }
+     if (typeof args.commit_message !== 'string' || !args.commit_message.trim()) {
+       return errorResult('Argument "commit_message" missing or empty.');
+     }
+ 
++    const hasPatch = typeof args.patch === 'string' && args.patch.trim().length > 0;
++    const hasPatchId = typeof args.patch_id === 'string' && args.patch_id.trim().length > 0;
++    if (hasPatch === hasPatchId) {
++      return errorResult('Provide exactly one of: "patch" (inline) or "patch_id" (from POST /uploads).');
 +    }
-     if (!selectedFile) {
-       setStatus('failed', 'No patch file selected', 'Drag or pick a .patch file before submitting.');
-       return;
++
++    let patchContent;
++    if (hasPatchId) {
++      patchContent = consumeUpload(args.patch_id.trim());
++      if (patchContent == null) {
++        return errorResult(`Upload "${args.patch_id}" not found or expired. Upload the patch again via POST /uploads.`);
++      }
++    } else {
++      patchContent = args.patch;
++    }
++
+     const author = (args.author_name && args.author_email)
+       ? { name: String(args.author_name), email: String(args.author_email) }
+       : undefined;
+@@ -100,7 +119,7 @@
+       token,
+       repo: parsed.repo,
+       branch: parsed.branch,
+-      patch: args.patch,
++      patch: patchContent,
+       commitMessage: args.commit_message,
+       author,
+     });

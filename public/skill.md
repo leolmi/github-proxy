@@ -20,10 +20,40 @@ This document is exposed via MCP as the resource `github-proxy://skill.md` and i
 | Argument | Required | Format |
 |---|---|---|
 | `coordinate` | yes | `owner/name:branch` (single colon) |
-| `patch` | yes | Output of `git diff` or `git format-patch -1 --stdout` |
+| `patch` | one of patch/patch_id | Output of `git diff` or `git format-patch -1 --stdout` (inline string) |
+| `patch_id` | one of patch/patch_id | Id returned by `POST /uploads` (see "Large patches" below) |
 | `commit_message` | yes | One-line summary, optionally followed by blank line + body |
 | `author_name` | no | Defaults to the GitHub user that owns the PAT |
 | `author_email` | no | Defaults to the GitHub user that owns the PAT |
+
+Provide exactly one of `patch` or `patch_id` — never both, never neither.
+
+## Large patches: `patch_id` workflow
+
+Inline `patch` is convenient for tiny diffs but expensive for anything bigger: the AI agent has to emit the whole patch as a tool argument, which burns output tokens proportional to patch size and slows the call dramatically (a 24KB patch = ~6000 output tokens before the proxy even runs).
+
+For non-trivial patches, prefer the upload + id flow:
+
+1. **Upload the patch** to the proxy as raw text:
+   ```sh
+   curl -X POST https://<proxy-host>/uploads \
+     -H "Authorization: Bearer <github-pat>" \
+     --data-binary @my.patch
+   ```
+   Response: `{ "id": "<uuid>", "expiresAt": "<iso>" }`. The id is single-use and expires after ~10 minutes.
+
+2. **Call `apply_patch`** with `patch_id` instead of `patch`:
+   ```json
+   {
+     "coordinate": "owner/name:branch",
+     "patch_id": "<uuid>",
+     "commit_message": "..."
+   }
+   ```
+
+The proxy resolves the id to the stored content and runs the same clone → apply → commit → push flow. The patch is consumed (deleted from the store) at lookup time, regardless of outcome — if `apply_patch` returns `needs_review` or `failed`, you must re-upload before retrying.
+
+If the id is unknown or already consumed/expired, the tool returns an error like `Upload "<id>" not found or expired.` — re-upload and try again.
 
 ## Outcomes — interpret carefully
 

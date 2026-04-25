@@ -10,6 +10,7 @@ const { readFile } = require('node:fs/promises');
 const path = require('node:path');
 
 const { applyPatch } = require('./applyPatch');
+const { consumeUpload } = require('./uploadsStore');
 
 const REPO_RE = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
 const SKILL_RESOURCE_URI = 'github-proxy://skill.md';
@@ -39,6 +40,7 @@ function buildServer(token) {
         'Use it when the user has (or you can generate) a git patch and wants it landed on a GitHub branch without cloning locally.',
         'Single or multi-file patches, including new files and renames, are supported.',
         'Coordinate format is "owner/name:branch" (e.g. "octocat/hello-world:main").',
+        'Provide the patch via EITHER "patch" (inline string) OR "patch_id" (id returned by POST /uploads). For non-trivial patches (more than a few KB) prefer "patch_id": upload the patch via "curl -X POST .../uploads -H \'Authorization: Bearer <pat>\' --data-binary @file.diff" and pass the returned id here. This avoids re-emitting the whole patch as a tool argument.',
         'Three outcomes: "success" returns commit_sha + commit_url; "needs_review" means the patch does NOT apply cleanly (operation SKIPPED — do NOT retry blindly, surface the conflict reason and suggest manual resolution); "failed" returns the underlying error in result.details.',
         'For edge cases, format tips, and detailed outcome handling, read the MCP resource "github-proxy://skill.md" via resources/read (or fetch the same content over HTTPS at "/skill.md" on this proxy host) before invoking the tool on non-trivial inputs.',
       ].join(' '),
@@ -51,7 +53,11 @@ function buildServer(token) {
           },
           patch: {
             type: 'string',
-            description: "Git patch content (output of 'git diff' or 'git format-patch'). Applied via 'git apply --3way'.",
+            description: "Git patch content (output of 'git diff' or 'git format-patch'). Applied via 'git apply --3way'. Mutually exclusive with patch_id.",
+          },
+          patch_id: {
+            type: 'string',
+            description: "Id returned by POST /uploads on this proxy. Single-use; expires after ~10 minutes. Mutually exclusive with patch.",
           },
           commit_message: {
             type: 'string',
@@ -66,7 +72,7 @@ function buildServer(token) {
             description: 'Commit author email. Optional: see author_name.',
           },
         },
-        required: ['coordinate', 'patch', 'commit_message'],
+        required: ['coordinate', 'commit_message'],
         additionalProperties: false,
       },
     }],
@@ -85,11 +91,24 @@ function buildServer(token) {
     if (!parsed) {
       return errorResult('Invalid coordinate. Expected format: owner/name:branch.');
     }
-    if (typeof args.patch !== 'string' || !args.patch.trim()) {
-      return errorResult('Argument "patch" missing or empty.');
-    }
     if (typeof args.commit_message !== 'string' || !args.commit_message.trim()) {
       return errorResult('Argument "commit_message" missing or empty.');
+    }
+
+    const hasPatch = typeof args.patch === 'string' && args.patch.trim().length > 0;
+    const hasPatchId = typeof args.patch_id === 'string' && args.patch_id.trim().length > 0;
+    if (hasPatch === hasPatchId) {
+      return errorResult('Provide exactly one of: "patch" (inline) or "patch_id" (from POST /uploads).');
+    }
+
+    let patchContent;
+    if (hasPatchId) {
+      patchContent = consumeUpload(args.patch_id.trim());
+      if (patchContent == null) {
+        return errorResult(`Upload "${args.patch_id}" not found or expired. Upload the patch again via POST /uploads.`);
+      }
+    } else {
+      patchContent = args.patch;
     }
 
     const author = (args.author_name && args.author_email)
@@ -100,7 +119,7 @@ function buildServer(token) {
       token,
       repo: parsed.repo,
       branch: parsed.branch,
-      patch: args.patch,
+      patch: patchContent,
       commitMessage: args.commit_message,
       author,
     });
