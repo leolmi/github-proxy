@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>github-proxy</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main>
+    <h1>github-proxy</h1>
+
+    <p class="warning">
+      Use a <strong>fine-grained PAT</strong> with minimal scope
+      (<code>Contents: Read &amp; Write</code> on the single target repo).
+      The token stays in your browser and travels over HTTPS only to this proxy.
+    </p>
+
+    <p class="info">
+      Also available as an <strong>MCP server</strong> for AI agents.
+      Endpoint: <code id="mcp-endpoint"></code>.
+      Configure your MCP client with this URL and an
+      <code>Authorization: Bearer &lt;PAT&gt;</code> header. See
+      <a href="https://github.com/leolmi/github-proxy" target="_blank" rel="noopener noreferrer">leolmi/github-proxy</a>
+      for details.
+    </p>
+
+    <form id="patch-form">
+      <label>
+        GitHub PAT
+        <input type="password" id="token" autocomplete="off" required />
+      </label>
+
+      <label>
+        Coordinate (owner/name:branch)
+        <div class="coordinate-input-row">
+          <input type="text" id="coordinate" placeholder="octocat/hello-world:main" required />
+          <button type="button" id="open-coordinates-dialog" class="icon-button" aria-label="Open saved pairs list" title="Saved pairs">
+            <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+              <path d="M3 5h12M3 9h12M3 13h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+            </svg>
+          </button>
+        </div>
+      </label>
+
+      <label>
+        Commit message
+        <input type="text" id="commit-message" required />
+      </label>
+
+      <div class="patch-field">
+        <span>Patch (<code>.patch</code> or <code>.diff</code> file)</span>
+        <input type="file" id="patch-file" accept=".patch,.diff,text/*" hidden />
+        <div class="drop-zone" id="drop-zone" role="button" tabindex="0" aria-label="Select or drop patch file">
+          <span class="drop-empty">Drag a patch file here, or click to pick one.</span>
+          <span class="drop-selected" hidden>
+            <strong id="patch-file-name"></strong>
+            <button type="button" id="patch-clear" class="patch-clear-btn" aria-label="Remove file">remove</button>
+          </span>
+        </div>
+      </div>
+
+      <button type="submit" id="submit-btn">Apply patch</button>
+    </form>
+
+    <section id="status" hidden>
+      <h2>Job status</h2>
+      <p id="status-line"></p>
+      <pre id="status-detail"></pre>
+    </section>
+
+    <dialog id="coordinates-dialog">
+      <h2>Saved pairs</h2>
+      <p id="coordinates-empty" hidden>No pairs saved.</p>
+      <ul id="coordinates-list"></ul>
+      <div class="dialog-actions">
+        <button type="button" id="coordinates-cancel">Cancel</button>
+        <button type="button" id="coordinates-confirm" disabled>Confirm</button>
+      </div>
+    </dialog>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
