@@ -142,6 +142,15 @@ Once connected, the client automatically discovers the **`apply_patch`** tool:
 
 The tool call is synchronous from the client's perspective: the proxy performs clone + apply + push and returns the final result directly. Polling, coordinate parsing, and state handling are hidden behind the MCP abstraction.
 
+The MCP server also exposes a documentation **resource** with detailed usage guidance, edge cases, and outcome handling:
+
+```
+URI:  github-proxy://skill.md
+Type: text/markdown
+```
+
+AI clients that support MCP resources can fetch it via `resources/read`. The same file is also served over HTTPS at `/skill.md` on the proxy host, and viewable directly on GitHub at [public/skill.md](public/skill.md).
+
 ## Security
 
 - **Generate a fine-grained PAT with minimal scope**: `Contents: Read & Write` on the single target repo. Never use a classic PAT with org-wide access.

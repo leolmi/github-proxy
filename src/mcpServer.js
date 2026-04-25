@@ -1,10 +1,19 @@
 const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
 const { StreamableHTTPServerTransport } = require('@modelcontextprotocol/sdk/server/streamableHttp.js');
-const { ListToolsRequestSchema, CallToolRequestSchema } = require('@modelcontextprotocol/sdk/types.js');
+const {
+  ListToolsRequestSchema,
+  CallToolRequestSchema,
+  ListResourcesRequestSchema,
+  ReadResourceRequestSchema,
+} = require('@modelcontextprotocol/sdk/types.js');
+const { readFile } = require('node:fs/promises');
+const path = require('node:path');
 
 const { applyPatch } = require('./applyPatch');
 
 const REPO_RE = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
+const SKILL_RESOURCE_URI = 'github-proxy://skill.md';
+const SKILL_FILE_PATH = path.join(__dirname, '..', 'public', 'skill.md');
 
 function parseCoordinate(text) {
   if (typeof text !== 'string') return null;
@@ -19,17 +28,19 @@ function parseCoordinate(text) {
 function buildServer(token) {
   const server = new Server(
     { name: 'github-proxy', version: '0.1.0' },
-    { capabilities: { tools: {} } },
+    { capabilities: { tools: {}, resources: {} } },
   );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: [{
       name: 'apply_patch',
       description: [
-        'Apply a git patch to a GitHub repository and push the resulting commit directly to the target branch.',
-        'Authentication is handled by the proxy via the GitHub PAT supplied as an Authorization header on the MCP connection.',
-        "Return states: 'success' (commit created and pushed), 'needs_review' (patch does not apply cleanly, operation skipped),",
-        "'failed' (clone/commit/push error or invalid input).",
+        'Apply a git patch to a GitHub repository: shallow clone, "git apply --3way", commit, then direct push to the target branch.',
+        'Use it when the user has (or you can generate) a git patch and wants it landed on a GitHub branch without cloning locally.',
+        'Single or multi-file patches, including new files and renames, are supported.',
+        'Coordinate format is "owner/name:branch" (e.g. "octocat/hello-world:main").',
+        'Three outcomes: "success" returns commit_sha + commit_url; "needs_review" means the patch does NOT apply cleanly (operation SKIPPED — do NOT retry blindly, surface the conflict reason and suggest manual resolution); "failed" returns the underlying error in result.details.',
+        'For edge cases, format tips, and detailed outcome handling, read the MCP resource "github-proxy://skill.md" via resources/read (or fetch the same content over HTTPS at "/skill.md" on this proxy host) before invoking the tool on non-trivial inputs.',
       ].join(' '),
       inputSchema: {
         type: 'object',
@@ -115,6 +126,27 @@ function buildServer(token) {
       `${outcome.result.error ?? 'unknown error'}\n\n${outcome.result.details ?? ''}`.trim(),
     );
   });
+
+  server.setRequestHandler(ListResourcesRequestSchema, async () => ({
+    resources: [{
+      uri: SKILL_RESOURCE_URI,
+      name: 'apply_patch usage guide',
+      description: 'Detailed instructions, edge cases, and outcome handling for the apply_patch tool. Also reachable over HTTPS at /skill.md on this proxy host.',
+      mimeType: 'text/markdown',
+    }],
+  }));
+
+  server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+    if (request.params.uri !== SKILL_RESOURCE_URI) {
+      throw new Error(`Unknown resource: ${request.params.uri}`);
+    }
+    const text = await readFile(SKILL_FILE_PATH, 'utf8');
+    return {
+      contents: [{ uri: SKILL_RESOURCE_URI, mimeType: 'text/markdown', text }],
+    };
+  });
+
+  // Note: the same skill.md is also web-served by express.static at /skill.md.
 
   return server;
 }
