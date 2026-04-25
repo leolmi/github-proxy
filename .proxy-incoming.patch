@@ -1,0 +1,33 @@
+Subject: [PATCH] icon
+---
+Index: public/index.html
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/public/index.html b/public/index.html
+--- a/public/index.html	(revision a0052adef69bcadf12721dabc143056de4570a2b)
++++ b/public/index.html	(date 1777115914587)
+@@ -4,6 +4,7 @@
+   <meta charset="utf-8" />
+   <meta name="viewport" content="width=device-width, initial-scale=1" />
+   <title>github-proxy</title>
++  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+   <link rel="stylesheet" href="style.css" />
+ </head>
+ <body>
+Index: public/favicon.svg
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/public/favicon.svg b/public/favicon.svg
+new file mode 100644
+--- /dev/null	(date 1777115913045)
++++ b/public/favicon.svg	(date 1777115913045)
+@@ -0,0 +1,5 @@
++<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
++  <rect width="32" height="32" rx="6" fill="#0d1117"/>
++  <rect x="7" y="9" width="18" height="5" rx="2.5" fill="#3fb950"/>
++  <rect x="7" y="18" width="12" height="5" rx="2.5" fill="#f85149"/>
++</svg>
