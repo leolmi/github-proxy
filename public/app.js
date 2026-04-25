@@ -5,6 +5,7 @@
 
   const form = document.getElementById('patch-form');
   const tokenEl = document.getElementById('token');
+  const patDescriptionEl = document.getElementById('pat-description');
   const coordinateEl = document.getElementById('coordinate');
   const commitMessageEl = document.getElementById('commit-message');
   const submitBtn = document.getElementById('submit-btn');
@@ -15,6 +16,14 @@
   const coordinatesEmptyEl = document.getElementById('coordinates-empty');
   const coordinatesConfirmBtn = document.getElementById('coordinates-confirm');
   const coordinatesCancelBtn = document.getElementById('coordinates-cancel');
+
+  const patDisplayEl = document.getElementById('pat-display');
+  const openPatBtn = document.getElementById('open-pat-dialog');
+  const patDialog = document.getElementById('pat-dialog');
+  const patDialogDescriptionEl = document.getElementById('pat-dialog-description');
+  const patDialogTokenEl = document.getElementById('pat-dialog-token');
+  const patDialogSaveBtn = document.getElementById('pat-dialog-save');
+  const patDialogCancelBtn = document.getElementById('pat-dialog-cancel');
 
   let savedCoordinates = [];
   let dialogSelectedIdx = -1;
@@ -35,7 +44,9 @@
   document.getElementById('mcp-endpoint').textContent = `${location.origin}/mcp`;
 
   loadSettings();
+  updatePatDisplay();
   setupCoordinatesDialog();
+  setupPatDialog();
   setupDropZone();
 
   form.addEventListener('submit', onSubmit);
@@ -131,6 +142,7 @@
       if (raw) {
         const saved = JSON.parse(raw);
         if (saved.token) tokenEl.value = saved.token;
+        if (saved.description) patDescriptionEl.value = saved.description;
 
         if (Array.isArray(saved.coordinates)) {
           savedCoordinates = saved.coordinates
@@ -162,6 +174,7 @@
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         token: tokenEl.value,
+        description: patDescriptionEl.value,
         coordinates: savedCoordinates,
       }));
     } catch (_) { /* quota exceeded, nothing to do */ }
@@ -171,6 +184,41 @@
     const idx = savedCoordinates.indexOf(coord);
     if (idx >= 0) savedCoordinates.splice(idx, 1);
     savedCoordinates.unshift(coord);
+  }
+
+  function setupPatDialog() {
+    openPatBtn.addEventListener('click', () => {
+      patDialogDescriptionEl.value = patDescriptionEl.value;
+      patDialogTokenEl.value = tokenEl.value;
+      patDialog.showModal();
+    });
+
+    patDialogCancelBtn.addEventListener('click', () => {
+      patDialog.close();
+    });
+
+    patDialogSaveBtn.addEventListener('click', () => {
+      patDescriptionEl.value = patDialogDescriptionEl.value.trim();
+      tokenEl.value = patDialogTokenEl.value.trim();
+      updatePatDisplay();
+      persistSettings();
+      patDialog.close();
+    });
+  }
+
+  function updatePatDisplay() {
+    const desc = patDescriptionEl.value.trim();
+    const hasToken = tokenEl.value.length > 0;
+    if (!hasToken) {
+      patDisplayEl.textContent = '(no PAT set)';
+      patDisplayEl.classList.add('is-empty');
+    } else if (desc) {
+      patDisplayEl.textContent = desc;
+      patDisplayEl.classList.remove('is-empty');
+    } else {
+      patDisplayEl.textContent = '(PAT set, no notes)';
+      patDisplayEl.classList.add('is-empty');
+    }
   }
 
   function setupCoordinatesDialog() {
@@ -286,6 +334,10 @@
 
   async function onSubmit(ev) {
     ev.preventDefault();
+    if (!tokenEl.value.trim()) {
+      setStatus('failed', 'No GitHub PAT set', 'Click the edit icon to enter your PAT.');
+      return;
+    }
     if (!selectedFile) {
       setStatus('failed', 'No patch file selected', 'Drag or pick a .patch file before submitting.');
       return;

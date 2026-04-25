@@ -84,6 +84,73 @@ textarea {
   flex: 1;
 }
 
+.pat-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.pat-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.pat-display {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-radius: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pat-display.is-empty {
+  opacity: 0.55;
+  font-style: italic;
+}
+
+#pat-dialog {
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-radius: 6px;
+  padding: 1.1rem 1.2rem;
+  max-width: 460px;
+  width: calc(100% - 2rem);
+  background: Canvas;
+  color: CanvasText;
+}
+
+#pat-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+#pat-dialog h2 {
+  margin: 0 0 0.9rem;
+  font-size: 1rem;
+}
+
+#pat-dialog label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.8rem;
+  font-size: 0.85rem;
+}
+
+#pat-dialog input[type="text"],
+#pat-dialog input[type="password"] {
+  font: inherit;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+}
+
 .icon-button {
   display: inline-flex;
   align-items: center;
