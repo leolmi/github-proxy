@@ -69,7 +69,15 @@ async function applyPatch({ token, repo, branch, patch, commitMessage, author })
     const patchFile = path.join(workdir, '.proxy-incoming.patch');
     await writeFile(patchFile, normalizePatch(patch));
 
-    const applied = await run('git', ['apply', '--3way', patchFile], { cwd: workdir });
+    let applied = await run('git', ['apply', '--3way', patchFile], { cwd: workdir });
+    if (applied.code !== 0 && /lacks the necessary blob/i.test(applied.stderr)) {
+      // The shallow clone is missing the base blobs the patch references.
+      // Fetch the full history and retry the 3-way apply.
+      const unshallow = await run('git', ['fetch', '--unshallow'], { cwd: workdir });
+      if (unshallow.code === 0) {
+        applied = await run('git', ['apply', '--3way', patchFile], { cwd: workdir });
+      }
+    }
     if (applied.code !== 0) {
       return {
         status: 'needs_review',
