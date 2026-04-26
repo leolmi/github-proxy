@@ -1,696 +1,81 @@
-Subject: [PATCH] coordinate list & validations
+Subject: [PATCH] repo dedicated dir
 ---
-Index: public/index.html
+Index: src/applyPatch.js
 IDEA additional info:
 Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
 <+>UTF-8
 ===================================================================
-diff --git a/public/index.html b/public/index.html
---- a/public/index.html	(revision ee64a24378a07c08b74d6a051ba4676a79fdafe3)
-+++ b/public/index.html	(date 1777198924282)
-@@ -40,17 +40,17 @@
-         </div>
-       </div>
- 
--      <label>
--        Coordinate (owner/name:branch)
--        <div class="coordinate-input-row">
--          <input type="text" id="coordinate" placeholder="octocat/hello-world:main" required />
--          <button type="button" id="open-coordinates-dialog" class="icon-button" aria-label="Open saved pairs list" title="Saved pairs">
--            <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
--              <path d="M3 5h12M3 9h12M3 13h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
-+      <div class="coord-field" id="coord-field">
-+        <span class="coord-label">Coordinate (owner/name:branch)</span>
-+        <div class="coord-row">
-+          <span class="coord-display is-empty" id="coord-display">(no coordinate set)</span>
-+          <button type="button" id="open-coordinates-dialog" class="icon-button" aria-label="Manage coordinates" title="Manage coordinates">
-+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-+              <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor" />
-             </svg>
-           </button>
-         </div>
--      </label>
-+      </div>
- 
-       <label>
-         Commit message
-@@ -70,7 +70,10 @@
-       </div>
- 
-       <div class="actions-row">
--        <button type="submit" id="submit-btn">Apply patch</button>
-+        <div class="submit-group">
-+          <button type="submit" id="submit-btn" disabled>Apply patch</button>
-+          <span id="submit-hint" class="submit-hint" hidden></span>
-+        </div>
-         <button type="button" id="reset-btn" hidden>Reset</button>
-       </div>
-     </form>
-@@ -82,12 +85,28 @@
-     </section>
- 
-     <dialog id="coordinates-dialog">
--      <h2>Saved pairs</h2>
--      <p id="coordinates-empty" hidden>No pairs saved.</p>
-+      <h2>Coordinates</h2>
-+
-+      <p id="coordinates-empty" hidden>No coordinates saved.</p>
-       <ul id="coordinates-list"></ul>
--      <div class="dialog-actions">
--        <button type="button" id="coordinates-cancel">Cancel</button>
--        <button type="button" id="coordinates-confirm" disabled>Confirm</button>
-+
-+      <button type="button" id="coord-add-new">+ Add new</button>
-+
-+      <div id="coord-edit-form" hidden>
-+        <h3 id="coord-edit-title">New coordinate</h3>
-+        <label>
-+          owner/name:branch
-+          <input type="text" id="coord-edit-input" placeholder="octocat/hello-world:main" />
-+        </label>
-+        <div class="dialog-actions">
-+          <button type="button" id="coord-edit-cancel">Cancel</button>
-+          <button type="button" id="coord-edit-save">Save</button>
-+        </div>
-+      </div>
-+
-+      <div class="dialog-actions" id="coord-main-actions">
-+        <button type="button" id="coordinates-cancel">Close</button>
-+        <button type="button" id="coordinates-confirm" disabled>Set as active</button>
-       </div>
-     </dialog>
- 
-Index: public/style.css
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
-diff --git a/public/style.css b/public/style.css
---- a/public/style.css	(revision ee64a24378a07c08b74d6a051ba4676a79fdafe3)
-+++ b/public/style.css	(date 1777199357511)
-@@ -75,29 +75,23 @@
-   font-size: 0.9rem;
- }
- 
--.coordinate-input-row {
--  display: flex;
--  gap: 0.5rem;
--}
--
--.coordinate-input-row input {
--  flex: 1;
--}
--
--.pat-field {
-+.pat-field,
-+.coord-field {
-   display: flex;
-   flex-direction: column;
-   gap: 0.25rem;
-   font-size: 0.9rem;
- }
- 
--.pat-row {
-+.pat-row,
-+.coord-row {
-   display: flex;
-   gap: 0.5rem;
-   align-items: stretch;
- }
- 
--.pat-display {
-+.pat-display,
-+.coord-display {
-   flex: 1;
-   display: flex;
-   align-items: center;
-@@ -109,7 +103,8 @@
-   text-overflow: ellipsis;
- }
- 
--.pat-display.is-empty {
-+.pat-display.is-empty,
-+.coord-display.is-empty {
-   opacity: 0.55;
-   font-style: italic;
- }
-@@ -236,11 +231,53 @@
- }
- 
- .coord-delete {
--  padding: 0.4rem 0.6rem;
--  font-size: 1rem;
-+  padding: 0.4rem 0.55rem;
-+  font-size: 0.85rem;
-+  line-height: 1;
-+}
-+
-+.coord-edit {
-+  padding: 0.4rem 0.55rem;
-+  font-size: 0.85rem;
-   line-height: 1;
- }
- 
-+.coord-pick-active {
-+  font-size: 0.75rem;
-+  opacity: 0.7;
-+  margin-left: 0.5rem;
-+  font-family: system-ui, sans-serif;
-+}
-+
-+#coord-add-new {
-+  margin: 0 0 1rem;
-+  font-size: 0.85rem;
-+  padding: 0.4rem 0.7rem;
-+}
-+
-+#coord-edit-form h3 {
-+  margin: 0 0 0.6rem;
-+  font-size: 0.95rem;
-+}
-+
-+#coord-edit-form label {
-+  display: flex;
-+  flex-direction: column;
-+  gap: 0.25rem;
-+  margin-bottom: 0.8rem;
-+  font-size: 0.85rem;
-+}
-+
-+#coord-edit-form input[type="text"] {
-+  font: inherit;
-+  padding: 0.45rem 0.55rem;
-+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
-+  border-radius: 4px;
-+  background: transparent;
-+  color: inherit;
-+  font-family: ui-monospace, Menlo, Consolas, monospace;
-+}
-+
- #pat-list {
-   list-style: none;
-   margin: 0 0 0.6rem;
-@@ -379,6 +416,13 @@
-   cursor: default;
- }
- 
-+#commit-message.is-warn,
-+.drop-zone.is-warn:not(.is-dragging):not(.has-file),
-+.pat-display.is-warn,
-+.coord-display.is-warn {
-+  border-color: orange;
-+}
-+
- .drop-selected {
-   display: flex;
-   align-items: center;
-@@ -409,6 +453,24 @@
-   gap: 0.5rem;
- }
- 
-+.submit-group {
-+  display: flex;
-+  align-items: center;
-+  gap: 0.7rem;
-+}
-+
-+.submit-hint {
-+  font-size: 0.85rem;
-+  opacity: 0.7;
-+  font-style: italic;
-+}
-+
-+#submit-btn:not(:disabled) {
-+  background: #1a7f37;
-+  border-color: #1a7f37;
-+  color: white;
-+}
-+
- button:disabled {
-   opacity: 0.5;
-   cursor: progress;
-Index: public/app.js
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
-diff --git a/public/app.js b/public/app.js
---- a/public/app.js	(revision ee64a24378a07c08b74d6a051ba4676a79fdafe3)
-+++ b/public/app.js	(date 1777199232527)
-@@ -4,17 +4,26 @@
-   const POLL_MAX_ATTEMPTS = 400; // ~10 minutes
- 
-   const form = document.getElementById('patch-form');
--  const coordinateEl = document.getElementById('coordinate');
-   const commitMessageEl = document.getElementById('commit-message');
-   const submitBtn = document.getElementById('submit-btn');
-+  const submitHintEl = document.getElementById('submit-hint');
-   const resetBtn = document.getElementById('reset-btn');
- 
-+  const coordFieldEl = document.getElementById('coord-field');
-+  const coordDisplayEl = document.getElementById('coord-display');
-   const openCoordinatesBtn = document.getElementById('open-coordinates-dialog');
-   const coordinatesDialog = document.getElementById('coordinates-dialog');
-   const coordinatesListEl = document.getElementById('coordinates-list');
-   const coordinatesEmptyEl = document.getElementById('coordinates-empty');
--  const coordinatesConfirmBtn = document.getElementById('coordinates-confirm');
-+  const coordAddNewBtn = document.getElementById('coord-add-new');
-+  const coordMainActionsEl = document.getElementById('coord-main-actions');
-   const coordinatesCancelBtn = document.getElementById('coordinates-cancel');
-+  const coordinatesConfirmBtn = document.getElementById('coordinates-confirm');
-+  const coordEditFormEl = document.getElementById('coord-edit-form');
-+  const coordEditTitleEl = document.getElementById('coord-edit-title');
-+  const coordEditInputEl = document.getElementById('coord-edit-input');
-+  const coordEditCancelBtn = document.getElementById('coord-edit-cancel');
-+  const coordEditSaveBtn = document.getElementById('coord-edit-save');
- 
-   const patFieldEl = document.getElementById('pat-field');
-   const patExpiredTagEl = document.getElementById('pat-expired-tag');
-@@ -36,7 +45,9 @@
-   const patEditSaveBtn = document.getElementById('pat-edit-save');
- 
-   let savedCoordinates = [];
--  let dialogSelectedIdx = -1;
-+  let activeCoordinate = null;
-+  let coordDialogSelected = null;
-+  let coordEditingIdx = -1;
- 
-   let pats = [];
-   let activePatId = null;
-@@ -60,14 +71,19 @@
- 
-   loadSettings();
-   updatePatDisplay();
-+  updateCoordinateDisplay();
-   updateResetVisibility();
-+  updateSubmitState();
-   setupCoordinatesDialog();
-   setupPatDialog();
-   setupDropZone();
- 
-   form.addEventListener('submit', onSubmit);
-   resetBtn.addEventListener('click', resetForm);
--  commitMessageEl.addEventListener('input', updateResetVisibility);
-+  commitMessageEl.addEventListener('input', () => {
-+    updateResetVisibility();
-+    updateSubmitState();
-+  });
- 
-   function setupDropZone() {
-     let depth = 0;
-@@ -134,6 +150,7 @@
-     dropSelectedEl.hidden = false;
-     dropZone.classList.add('has-file');
-     updateResetVisibility();
-+    updateSubmitState();
+diff --git a/src/applyPatch.js b/src/applyPatch.js
+--- a/src/applyPatch.js	(revision 014ea5e89bdaa67cdda0aaa01a7d4863bf4c870e)
++++ b/src/applyPatch.js	(date 1777213936406)
+@@ -40,6 +40,7 @@
    }
  
-   function clearFile() {
-@@ -143,6 +160,7 @@
-     dropSelectedEl.hidden = true;
-     dropZone.classList.remove('has-file');
-     updateResetVisibility();
-+    updateSubmitState();
-   }
+   const workdir = await mkdtemp(path.join(tmpdir(), 'gh-proxy-'));
++  const repoDir = path.join(workdir, 'repo');
  
-   function hasFiles(ev) {
-@@ -182,14 +200,18 @@
-       if (Array.isArray(saved.coordinates)) {
-         savedCoordinates = saved.coordinates
-           .map(toCoordinateString)
--          .filter((c) => c !== null);
-+          .filter((c) => c !== null && parseCoordinate(c) !== null);
-       } else if (saved.repo && saved.branch) {
-         // Migration from the legacy { token, repo, branch } format
-         savedCoordinates = [`${saved.repo}:${saved.branch}`];
+   try {
+     const remote = `https://x-access-token:${token}@github.com/${repo}.git`;
+@@ -50,7 +51,7 @@
+       '--single-branch',
+       '--branch', branch,
+       remote,
+-      workdir,
++      repoDir,
+     ]);
+     if (cloned.code !== 0) {
+       return {
+@@ -66,16 +67,18 @@
+       ? author
+       : await fetchAuthorFromGitHub(token);
+ 
++    // The patch file lives in workdir, outside the repo working tree, so
++    // `git add -A` never picks it up.
+     const patchFile = path.join(workdir, '.proxy-incoming.patch');
+     await writeFile(patchFile, normalizePatch(patch));
+ 
+-    let applied = await run('git', ['apply', '--3way', patchFile], { cwd: workdir });
++    let applied = await run('git', ['apply', '--3way', patchFile], { cwd: repoDir });
+     if (applied.code !== 0 && /lacks the necessary blob/i.test(applied.stderr)) {
+       // The shallow clone is missing the base blobs the patch references.
+       // Fetch the full history and retry the 3-way apply.
+-      const unshallow = await run('git', ['fetch', '--unshallow'], { cwd: workdir });
++      const unshallow = await run('git', ['fetch', '--unshallow'], { cwd: repoDir });
+       if (unshallow.code === 0) {
+-        applied = await run('git', ['apply', '--3way', patchFile], { cwd: workdir });
++        applied = await run('git', ['apply', '--3way', patchFile], { cwd: repoDir });
        }
- 
--      if (savedCoordinates.length > 0 && !coordinateEl.value) {
--        coordinateEl.value = savedCoordinates[0];
-+      if (typeof saved.activeCoordinate === 'string'
-+          && savedCoordinates.includes(saved.activeCoordinate)) {
-+        activeCoordinate = saved.activeCoordinate;
-+      } else if (savedCoordinates.length > 0) {
-+        // Migration: previously the first item was implicitly active.
-+        activeCoordinate = savedCoordinates[0];
-       }
-     } catch (_) {
-       // ignore corrupt storage
-@@ -213,30 +235,17 @@
-     return `pat_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-   }
- 
--  function saveCoordinatesAndPersist() {
--    const coord = coordinateEl.value.trim();
--    if (coord && parseCoordinate(coord)) {
--      addOrPromoteCoordinate(coord);
--    }
--    persistSettings();
--  }
--
-   function persistSettings() {
-     try {
-       localStorage.setItem(STORAGE_KEY, JSON.stringify({
-         pats,
-         activePatId,
-         coordinates: savedCoordinates,
-+        activeCoordinate,
-       }));
-     } catch (_) { /* quota exceeded, nothing to do */ }
-   }
- 
--  function addOrPromoteCoordinate(coord) {
--    const idx = savedCoordinates.indexOf(coord);
--    if (idx >= 0) savedCoordinates.splice(idx, 1);
--    savedCoordinates.unshift(coord);
--  }
--
-   function getActivePat() {
-     return pats.find((p) => p.id === activePatId) || null;
-   }
-@@ -250,7 +259,7 @@
-   function setupPatDialog() {
-     openPatBtn.addEventListener('click', () => {
-       patDialogSelectedId = activePatId;
--      hideEditForm();
-+      hidePatEditForm();
-       renderPatList();
-       patDialog.showModal();
-     });
-@@ -269,11 +278,11 @@
-     });
- 
-     patAddNewBtn.addEventListener('click', () => {
--      showEditForm(null);
-+      showPatEditForm(null);
-     });
- 
-     patEditCancelBtn.addEventListener('click', () => {
--      hideEditForm();
-+      hidePatEditForm();
-       renderPatList();
-     });
- 
-@@ -307,14 +316,14 @@
-       }
-       persistSettings();
-       updatePatDisplay();
--      hideEditForm();
-+      hidePatEditForm();
-       renderPatList();
-     });
- 
-     patListEl.addEventListener('click', (ev) => {
-       const editBtn = ev.target.closest('.pat-edit');
-       if (editBtn) {
--        showEditForm(editBtn.dataset.id);
-+        showPatEditForm(editBtn.dataset.id);
-         return;
-       }
-       const delBtn = ev.target.closest('.pat-delete');
-@@ -338,7 +347,7 @@
-     });
-   }
- 
--  function showEditForm(id) {
-+  function showPatEditForm(id) {
-     patEditingId = id;
-     if (id) {
-       const pat = pats.find((p) => p.id === id);
-@@ -360,7 +369,7 @@
-     patEditFormEl.hidden = false;
-   }
- 
--  function hideEditForm() {
-+  function hidePatEditForm() {
-     patEditingId = null;
-     patEditFormEl.hidden = true;
-     patAddNewBtn.hidden = false;
-@@ -450,12 +459,13 @@
- 
-     patFieldEl.classList.toggle('is-expired', expired);
-     patExpiredTagEl.hidden = !expired;
-+    updateSubmitState();
-   }
- 
-   function setupCoordinatesDialog() {
-     openCoordinatesBtn.addEventListener('click', () => {
--      dialogSelectedIdx = -1;
--      coordinatesConfirmBtn.disabled = true;
-+      coordDialogSelected = activeCoordinate;
-+      hideCoordEditForm();
-       renderCoordinatesDialog();
-       coordinatesDialog.showModal();
-     });
-@@ -465,40 +475,102 @@
-     });
- 
-     coordinatesConfirmBtn.addEventListener('click', () => {
--      if (dialogSelectedIdx >= 0 && savedCoordinates[dialogSelectedIdx]) {
--        coordinateEl.value = savedCoordinates[dialogSelectedIdx];
-+      if (coordDialogSelected && savedCoordinates.includes(coordDialogSelected)) {
-+        activeCoordinate = coordDialogSelected;
-+        persistSettings();
-+        updateCoordinateDisplay();
-       }
-       coordinatesDialog.close();
-     });
- 
-+    coordAddNewBtn.addEventListener('click', () => {
-+      showCoordEditForm(-1);
-+    });
-+
-+    coordEditCancelBtn.addEventListener('click', () => {
-+      hideCoordEditForm();
-+      renderCoordinatesDialog();
-+    });
-+
-+    coordEditSaveBtn.addEventListener('click', () => {
-+      const text = coordEditInputEl.value.trim();
-+      if (!parseCoordinate(text)) {
-+        coordEditInputEl.focus();
-+        return;
-+      }
-+      if (coordEditingIdx >= 0) {
-+        const oldValue = savedCoordinates[coordEditingIdx];
-+        savedCoordinates[coordEditingIdx] = text;
-+        // Dedupe: drop other occurrences of the new value
-+        for (let i = savedCoordinates.length - 1; i >= 0; i--) {
-+          if (i !== coordEditingIdx && savedCoordinates[i] === text) {
-+            savedCoordinates.splice(i, 1);
-+          }
-+        }
-+        if (activeCoordinate === oldValue) activeCoordinate = text;
-+        if (coordDialogSelected === oldValue) coordDialogSelected = text;
-+      } else {
-+        if (!savedCoordinates.includes(text)) {
-+          savedCoordinates.push(text);
-+        }
-+        if (!activeCoordinate) {
-+          activeCoordinate = text;
-+          coordDialogSelected = text;
-+        }
-+      }
-+      persistSettings();
-+      updateCoordinateDisplay();
-+      hideCoordEditForm();
-+      renderCoordinatesDialog();
-+    });
-+
-     coordinatesListEl.addEventListener('click', (ev) => {
--      const pickBtn = ev.target.closest('.coord-pick');
--      if (pickBtn) {
--        selectInDialog(parseInt(pickBtn.dataset.index, 10));
-+      const editBtn = ev.target.closest('.coord-edit');
-+      if (editBtn) {
-+        showCoordEditForm(parseInt(editBtn.dataset.index, 10));
-         return;
-       }
-       const delBtn = ev.target.closest('.coord-delete');
-       if (delBtn) {
-         const idx = parseInt(delBtn.dataset.index, 10);
-+        const value = savedCoordinates[idx];
-         savedCoordinates.splice(idx, 1);
-+        if (activeCoordinate === value) activeCoordinate = null;
-+        if (coordDialogSelected === value) coordDialogSelected = activeCoordinate;
-         persistSettings();
--        if (dialogSelectedIdx === idx) {
--          dialogSelectedIdx = -1;
--          coordinatesConfirmBtn.disabled = true;
--        } else if (dialogSelectedIdx > idx) {
--          dialogSelectedIdx--;
--        }
-+        updateCoordinateDisplay();
-+        renderCoordinatesDialog();
-+        return;
-+      }
-+      const pickBtn = ev.target.closest('.coord-pick');
-+      if (pickBtn) {
-+        coordDialogSelected = savedCoordinates[parseInt(pickBtn.dataset.index, 10)];
-         renderCoordinatesDialog();
-       }
-     });
-   }
- 
--  function selectInDialog(idx) {
--    dialogSelectedIdx = idx;
--    coordinatesConfirmBtn.disabled = idx < 0;
--    for (const btn of coordinatesListEl.querySelectorAll('.coord-pick')) {
--      btn.classList.toggle('is-selected', parseInt(btn.dataset.index, 10) === idx);
-+  function showCoordEditForm(idx) {
-+    coordEditingIdx = idx;
-+    if (idx >= 0) {
-+      coordEditTitleEl.textContent = 'Edit coordinate';
-+      coordEditInputEl.value = savedCoordinates[idx] || '';
-+    } else {
-+      coordEditTitleEl.textContent = 'New coordinate';
-+      coordEditInputEl.value = '';
      }
-+    coordinatesListEl.hidden = true;
-+    coordinatesEmptyEl.hidden = true;
-+    coordAddNewBtn.hidden = true;
-+    coordMainActionsEl.hidden = true;
-+    coordEditFormEl.hidden = false;
-+  }
-+
-+  function hideCoordEditForm() {
-+    coordEditingIdx = -1;
-+    coordEditFormEl.hidden = true;
-+    coordAddNewBtn.hidden = false;
-+    coordMainActionsEl.hidden = false;
-   }
- 
-   function renderCoordinatesDialog() {
-@@ -506,6 +578,7 @@
-     if (savedCoordinates.length === 0) {
-       coordinatesEmptyEl.hidden = false;
-       coordinatesListEl.hidden = true;
-+      coordinatesConfirmBtn.disabled = true;
-       return;
+     if (applied.code !== 0) {
+@@ -87,25 +90,25 @@
+       };
      }
-     coordinatesEmptyEl.hidden = true;
-@@ -518,8 +591,23 @@
-       pick.type = 'button';
-       pick.className = 'coord-pick';
-       pick.dataset.index = String(i);
--      pick.textContent = coord;
--      if (i === dialogSelectedIdx) pick.classList.add('is-selected');
-+      pick.appendChild(document.createTextNode(coord));
-+
-+      if (coord === activeCoordinate) {
-+        const activeTag = document.createElement('span');
-+        activeTag.className = 'coord-pick-active';
-+        activeTag.textContent = '(active)';
-+        pick.appendChild(activeTag);
-+      }
-+
-+      if (coord === coordDialogSelected) pick.classList.add('is-selected');
-+
-+      const edit = document.createElement('button');
-+      edit.type = 'button';
-+      edit.className = 'coord-edit';
-+      edit.dataset.index = String(i);
-+      edit.setAttribute('aria-label', `Edit ${coord}`);
-+      edit.textContent = 'edit';
  
-       const del = document.createElement('button');
-       del.type = 'button';
-@@ -529,12 +617,30 @@
-       del.textContent = '×';
+-    await run('git', ['config', 'user.name', finalAuthor.name], { cwd: workdir });
+-    await run('git', ['config', 'user.email', finalAuthor.email], { cwd: workdir });
++    await run('git', ['config', 'user.name', finalAuthor.name], { cwd: repoDir });
++    await run('git', ['config', 'user.email', finalAuthor.email], { cwd: repoDir });
  
-       li.appendChild(pick);
-+      li.appendChild(edit);
-       li.appendChild(del);
-       coordinatesListEl.appendChild(li);
-     });
-+
-+    coordinatesConfirmBtn.disabled =
-+      !coordDialogSelected
-+      || coordDialogSelected === activeCoordinate
-+      || !savedCoordinates.includes(coordDialogSelected);
-+  }
-+
-+  function updateCoordinateDisplay() {
-+    if (activeCoordinate) {
-+      coordDisplayEl.textContent = activeCoordinate;
-+      coordDisplayEl.classList.remove('is-empty');
-+    } else {
-+      coordDisplayEl.textContent = '(no coordinate set)';
-+      coordDisplayEl.classList.add('is-empty');
-+    }
-+    updateSubmitState();
-   }
- 
-   function parseCoordinate(text) {
-+    if (typeof text !== 'string') return null;
-     const sep = text.indexOf(':');
-     if (sep < 0) return null;
-     const repo = text.slice(0, sep).trim();
-@@ -574,12 +680,11 @@
-       setStatus('failed', 'No patch file selected', 'Drag or pick a .patch file before submitting.');
-       return;
+-    const added = await run('git', ['add', '-A'], { cwd: workdir });
++    const added = await run('git', ['add', '-A'], { cwd: repoDir });
+     if (added.code !== 0) {
+       return { status: 'failed', result: { error: 'git add failed', details: redactToken(added.stderr, token) } };
      }
--    const parsed = parseCoordinate(coordinateEl.value.trim());
-+    const parsed = parseCoordinate(activeCoordinate || '');
-     if (!parsed) {
--      setStatus('failed', 'Invalid coordinate', 'Expected format: owner/name:branch');
-+      setStatus('failed', 'No coordinate set', 'Click the edit icon to add one.');
-       return;
+ 
+-    const committed = await run('git', ['commit', '-m', commitMessage], { cwd: workdir });
++    const committed = await run('git', ['commit', '-m', commitMessage], { cwd: repoDir });
+     if (committed.code !== 0) {
+       return { status: 'failed', result: { error: 'git commit failed', details: redactToken(committed.stderr, token) } };
      }
--    saveCoordinatesAndPersist();
-     setStatus('running', 'Sending request...', '');
-     submitBtn.disabled = true;
  
-@@ -611,7 +716,7 @@
-     } catch (err) {
-       setStatus('failed', 'Network error', String(err?.message ?? err));
-     } finally {
--      submitBtn.disabled = false;
-+      updateSubmitState();
+-    const pushed = await run('git', ['push', 'origin', branch], { cwd: workdir });
++    const pushed = await run('git', ['push', 'origin', branch], { cwd: repoDir });
+     if (pushed.code !== 0) {
+       return { status: 'failed', result: { error: 'git push failed', details: redactToken(pushed.stderr, token) } };
      }
-   }
  
-@@ -680,6 +785,27 @@
-     resetBtn.hidden = !dirty;
-   }
+-    const sha = await run('git', ['rev-parse', 'HEAD'], { cwd: workdir });
++    const sha = await run('git', ['rev-parse', 'HEAD'], { cwd: repoDir });
+     const commitSha = sha.stdout.trim();
  
-+  function updateSubmitState() {
-+    const missingPat = !getActivePat();
-+    const missingCoord = !activeCoordinate;
-+    const missingMessage = !commitMessageEl.value.trim();
-+    const missingFile = !selectedFile;
-+    let reason = '';
-+    if (missingPat) reason = 'GitHub PAT required';
-+    else if (missingCoord) reason = 'Coordinate required';
-+    else if (missingMessage) reason = 'Commit message required';
-+    else if (missingFile) reason = 'Patch file required';
-+
-+    submitBtn.disabled = !!reason;
-+    submitHintEl.textContent = reason;
-+    submitHintEl.hidden = !reason;
-+
-+    patDisplayEl.classList.toggle('is-warn', missingPat);
-+    coordDisplayEl.classList.toggle('is-warn', missingCoord);
-+    commitMessageEl.classList.toggle('is-warn', missingMessage);
-+    dropZone.classList.toggle('is-warn', missingFile);
-+  }
-+
-   function resetForm() {
-     commitMessageEl.value = '';
-     clearFile();
-Index: package.json
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
-diff --git a/package.json b/package.json
---- a/package.json	(revision ee64a24378a07c08b74d6a051ba4676a79fdafe3)
-+++ b/package.json	(date 1777199444459)
-@@ -1,6 +1,6 @@
- {
-   "name": "github-proxy",
--  "version": "0.1.1",
-+  "version": "0.1.2",
-   "description": "Stateless proxy that applies git patches to GitHub repositories via a Personal Access Token.",
-   "private": true,
-   "license": "MIT",
+     return {

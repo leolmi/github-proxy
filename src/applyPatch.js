@@ -40,6 +40,7 @@ async function applyPatch({ token, repo, branch, patch, commitMessage, author })
   }
 
   const workdir = await mkdtemp(path.join(tmpdir(), 'gh-proxy-'));
+  const repoDir = path.join(workdir, 'repo');
 
   try {
     const remote = `https://x-access-token:${token}@github.com/${repo}.git`;
@@ -50,7 +51,7 @@ async function applyPatch({ token, repo, branch, patch, commitMessage, author })
       '--single-branch',
       '--branch', branch,
       remote,
-      workdir,
+      repoDir,
     ]);
     if (cloned.code !== 0) {
       return {
@@ -66,16 +67,18 @@ async function applyPatch({ token, repo, branch, patch, commitMessage, author })
       ? author
       : await fetchAuthorFromGitHub(token);
 
+    // The patch file lives in workdir, outside the repo working tree, so
+    // `git add -A` never picks it up.
     const patchFile = path.join(workdir, '.proxy-incoming.patch');
     await writeFile(patchFile, normalizePatch(patch));
 
-    let applied = await run('git', ['apply', '--3way', patchFile], { cwd: workdir });
+    let applied = await run('git', ['apply', '--3way', patchFile], { cwd: repoDir });
     if (applied.code !== 0 && /lacks the necessary blob/i.test(applied.stderr)) {
       // The shallow clone is missing the base blobs the patch references.
       // Fetch the full history and retry the 3-way apply.
-      const unshallow = await run('git', ['fetch', '--unshallow'], { cwd: workdir });
+      const unshallow = await run('git', ['fetch', '--unshallow'], { cwd: repoDir });
       if (unshallow.code === 0) {
-        applied = await run('git', ['apply', '--3way', patchFile], { cwd: workdir });
+        applied = await run('git', ['apply', '--3way', patchFile], { cwd: repoDir });
       }
     }
     if (applied.code !== 0) {
@@ -87,25 +90,25 @@ async function applyPatch({ token, repo, branch, patch, commitMessage, author })
       };
     }
 
-    await run('git', ['config', 'user.name', finalAuthor.name], { cwd: workdir });
-    await run('git', ['config', 'user.email', finalAuthor.email], { cwd: workdir });
+    await run('git', ['config', 'user.name', finalAuthor.name], { cwd: repoDir });
+    await run('git', ['config', 'user.email', finalAuthor.email], { cwd: repoDir });
 
-    const added = await run('git', ['add', '-A'], { cwd: workdir });
+    const added = await run('git', ['add', '-A'], { cwd: repoDir });
     if (added.code !== 0) {
       return { status: 'failed', result: { error: 'git add failed', details: redactToken(added.stderr, token) } };
     }
 
-    const committed = await run('git', ['commit', '-m', commitMessage], { cwd: workdir });
+    const committed = await run('git', ['commit', '-m', commitMessage], { cwd: repoDir });
     if (committed.code !== 0) {
       return { status: 'failed', result: { error: 'git commit failed', details: redactToken(committed.stderr, token) } };
     }
 
-    const pushed = await run('git', ['push', 'origin', branch], { cwd: workdir });
+    const pushed = await run('git', ['push', 'origin', branch], { cwd: repoDir });
     if (pushed.code !== 0) {
       return { status: 'failed', result: { error: 'git push failed', details: redactToken(pushed.stderr, token) } };
     }
 
-    const sha = await run('git', ['rev-parse', 'HEAD'], { cwd: workdir });
+    const sha = await run('git', ['rev-parse', 'HEAD'], { cwd: repoDir });
     const commitSha = sha.stdout.trim();
 
     return {
