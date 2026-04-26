@@ -40,17 +40,17 @@
         </div>
       </div>
 
-      <label>
-        Coordinate (owner/name:branch)
-        <div class="coordinate-input-row">
-          <input type="text" id="coordinate" placeholder="octocat/hello-world:main" required />
-          <button type="button" id="open-coordinates-dialog" class="icon-button" aria-label="Open saved pairs list" title="Saved pairs">
-            <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-              <path d="M3 5h12M3 9h12M3 13h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+      <div class="coord-field" id="coord-field">
+        <span class="coord-label">Coordinate (owner/name:branch)</span>
+        <div class="coord-row">
+          <span class="coord-display is-empty" id="coord-display">(no coordinate set)</span>
+          <button type="button" id="open-coordinates-dialog" class="icon-button" aria-label="Manage coordinates" title="Manage coordinates">
+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor" />
             </svg>
           </button>
         </div>
-      </label>
+      </div>
 
       <label>
         Commit message
@@ -70,7 +70,10 @@
       </div>
 
       <div class="actions-row">
-        <button type="submit" id="submit-btn">Apply patch</button>
+        <div class="submit-group">
+          <button type="submit" id="submit-btn" disabled>Apply patch</button>
+          <span id="submit-hint" class="submit-hint" hidden></span>
+        </div>
         <button type="button" id="reset-btn" hidden>Reset</button>
       </div>
     </form>
@@ -82,12 +85,28 @@
     </section>
 
     <dialog id="coordinates-dialog">
-      <h2>Saved pairs</h2>
-      <p id="coordinates-empty" hidden>No pairs saved.</p>
+      <h2>Coordinates</h2>
+
+      <p id="coordinates-empty" hidden>No coordinates saved.</p>
       <ul id="coordinates-list"></ul>
-      <div class="dialog-actions">
-        <button type="button" id="coordinates-cancel">Cancel</button>
-        <button type="button" id="coordinates-confirm" disabled>Confirm</button>
+
+      <button type="button" id="coord-add-new">+ Add new</button>
+
+      <div id="coord-edit-form" hidden>
+        <h3 id="coord-edit-title">New coordinate</h3>
+        <label>
+          owner/name:branch
+          <input type="text" id="coord-edit-input" placeholder="octocat/hello-world:main" />
+        </label>
+        <div class="dialog-actions">
+          <button type="button" id="coord-edit-cancel">Cancel</button>
+          <button type="button" id="coord-edit-save">Save</button>
+        </div>
+      </div>
+
+      <div class="dialog-actions" id="coord-main-actions">
+        <button type="button" id="coordinates-cancel">Close</button>
+        <button type="button" id="coordinates-confirm" disabled>Set as active</button>
       </div>
     </dialog>
 

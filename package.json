@@ -1,6 +1,6 @@
 {
   "name": "github-proxy",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Stateless proxy that applies git patches to GitHub repositories via a Personal Access Token.",
   "private": true,
   "license": "MIT",
