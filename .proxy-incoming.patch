@@ -1,4 +1,4 @@
-Subject: [PATCH] clear form
+Subject: [PATCH] PAT list, expired field, reset, app version
 ---
 Index: public/index.html
 IDEA additional info:
@@ -6,78 +6,715 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
 <+>UTF-8
 ===================================================================
 diff --git a/public/index.html b/public/index.html
---- a/public/index.html	(revision c766181b76ed7026158bec073d5afabf58dedb64)
-+++ b/public/index.html	(date 1777144573591)
-@@ -70,7 +70,10 @@
+--- a/public/index.html	(revision a7fc85623129dfda01bbebc93c7bb10336e2adea)
++++ b/public/index.html	(date 1777197738498)
+@@ -1,9 +1,10 @@
+ <!doctype html>
+ <html lang="en">
+ <head>
++  <!-- version: dev -->
+   <meta charset="utf-8" />
+   <meta name="viewport" content="width=device-width, initial-scale=1" />
+-  <title>github-proxy</title>
++  <title>GitHub Proxy</title>
+   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+   <link rel="stylesheet" href="style.css" />
+ </head>
+@@ -27,18 +28,16 @@
+     </p>
+ 
+     <form id="patch-form">
+-      <div class="pat-field">
+-        <span>GitHub PAT</span>
++      <div class="pat-field" id="pat-field">
++        <span class="pat-label">GitHub PAT<span id="pat-expired-tag" class="pat-expired-tag" hidden> (expired)</span></span>
+         <div class="pat-row">
+           <span class="pat-display is-empty" id="pat-display">(no PAT set)</span>
+-          <button type="button" id="open-pat-dialog" class="icon-button" aria-label="Edit PAT" title="Edit PAT">
++          <button type="button" id="open-pat-dialog" class="icon-button" aria-label="Manage PATs" title="Manage PATs">
+             <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+               <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor" />
+             </svg>
+           </button>
          </div>
+-        <input type="hidden" id="token" />
+-        <input type="hidden" id="pat-description" />
        </div>
  
--      <button type="submit" id="submit-btn">Apply patch</button>
-+      <div class="actions-row">
-+        <button type="submit" id="submit-btn">Apply patch</button>
-+        <button type="button" id="reset-btn" hidden>Reset</button>
-+      </div>
-     </form>
+       <label>
+@@ -93,18 +92,36 @@
+     </dialog>
  
-     <section id="status" hidden>
+     <dialog id="pat-dialog">
+-      <h2>GitHub PAT</h2>
+-      <label>
+-        Notes (memo, not sent anywhere)
+-        <input type="text" id="pat-dialog-description" placeholder="e.g. project-name, expires 2026-05-25" />
+-      </label>
+-      <label>
+-        Token
+-        <input type="password" id="pat-dialog-token" autocomplete="off" />
+-      </label>
+-      <div class="dialog-actions">
+-        <button type="button" id="pat-dialog-cancel">Cancel</button>
+-        <button type="button" id="pat-dialog-save">Save</button>
++      <h2>GitHub PATs</h2>
++
++      <p id="pat-list-empty" hidden>No PATs saved.</p>
++      <ul id="pat-list"></ul>
++
++      <button type="button" id="pat-add-new">+ Add new</button>
++
++      <div id="pat-edit-form" hidden>
++        <h3 id="pat-edit-title">New PAT</h3>
++        <label>
++          Description (memo, not sent anywhere)
++          <input type="text" id="pat-dialog-description" placeholder="e.g. project-name" />
++        </label>
++        <label>
++          Token
++          <input type="password" id="pat-dialog-token" autocomplete="off" />
++        </label>
++        <label>
++          Expires (blank = never)
++          <input type="date" id="pat-dialog-expires" />
++        </label>
++        <div class="dialog-actions">
++          <button type="button" id="pat-edit-cancel">Cancel</button>
++          <button type="button" id="pat-edit-save">Save</button>
++        </div>
++      </div>
++
++      <div class="dialog-actions" id="pat-main-actions">
++        <button type="button" id="pat-dialog-cancel">Close</button>
++        <button type="button" id="pat-dialog-confirm" disabled>Set as active</button>
+       </div>
+     </dialog>
+   </main>
 Index: public/style.css
 IDEA additional info:
 Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
 <+>UTF-8
 ===================================================================
 diff --git a/public/style.css b/public/style.css
---- a/public/style.css	(revision c766181b76ed7026158bec073d5afabf58dedb64)
-+++ b/public/style.css	(date 1777144581712)
-@@ -289,6 +289,13 @@
-   color: inherit;
+--- a/public/style.css	(revision a7fc85623129dfda01bbebc93c7bb10336e2adea)
++++ b/public/style.css	(date 1777196423007)
+@@ -114,6 +114,17 @@
+   font-style: italic;
  }
  
-+.actions-row {
-+  display: flex;
-+  justify-content: space-between;
-+  align-items: center;
-+  gap: 0.5rem;
++.pat-field.is-expired > .pat-label,
++.pat-expired-tag {
++  color: #c92a2a;
++  font-weight: 600;
 +}
 +
- button:disabled {
-   opacity: 0.5;
-   cursor: progress;
++.pat-field.is-expired .pat-display {
++  border-color: #c92a2a;
++  background: rgba(201, 42, 42, 0.08);
++}
++
+ #pat-dialog {
+   border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+   border-radius: 6px;
+@@ -230,6 +241,108 @@
+   line-height: 1;
+ }
+ 
++#pat-list {
++  list-style: none;
++  margin: 0 0 0.6rem;
++  padding: 0;
++  display: flex;
++  flex-direction: column;
++  gap: 0.3rem;
++  max-height: 50vh;
++  overflow-y: auto;
++}
++
++#pat-list li {
++  display: flex;
++  gap: 0.4rem;
++}
++
++#pat-list-empty {
++  margin: 0 0 0.6rem;
++  opacity: 0.7;
++  font-size: 0.9rem;
++}
++
++.pat-pick {
++  flex: 1;
++  text-align: left;
++  padding: 0.45rem 0.6rem;
++  font-size: 0.85rem;
++  border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
++  border-radius: 4px;
++  background: transparent;
++  color: inherit;
++  cursor: pointer;
++  display: flex;
++  flex-wrap: wrap;
++  align-items: baseline;
++  gap: 0.25rem;
++}
++
++.pat-pick:hover,
++.pat-pick:focus-visible {
++  border-color: currentColor;
++  outline: none;
++}
++
++.pat-pick.is-selected {
++  border-color: currentColor;
++  background: color-mix(in srgb, currentColor 8%, transparent);
++}
++
++.pat-pick-desc.is-empty {
++  font-style: italic;
++  opacity: 0.7;
++}
++
++.pat-pick-active {
++  font-size: 0.75rem;
++  opacity: 0.7;
++}
++
++.pat-pick-expired {
++  font-size: 0.75rem;
++  color: #c92a2a;
++  font-weight: 600;
++}
++
++.pat-edit,
++.pat-delete {
++  padding: 0.4rem 0.55rem;
++  font-size: 0.85rem;
++  line-height: 1;
++}
++
++#pat-add-new {
++  margin: 0 0 1rem;
++  font-size: 0.85rem;
++  padding: 0.4rem 0.7rem;
++}
++
++#pat-edit-form h3 {
++  margin: 0 0 0.6rem;
++  font-size: 0.95rem;
++}
++
++#pat-edit-form label {
++  display: flex;
++  flex-direction: column;
++  gap: 0.25rem;
++  margin-bottom: 0.8rem;
++  font-size: 0.85rem;
++}
++
++#pat-edit-form input[type="text"],
++#pat-edit-form input[type="password"],
++#pat-edit-form input[type="date"] {
++  font: inherit;
++  padding: 0.45rem 0.55rem;
++  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
++  border-radius: 4px;
++  background: transparent;
++  color: inherit;
++}
++
+ .dialog-actions {
+   display: flex;
+   justify-content: flex-end;
 Index: public/app.js
 IDEA additional info:
 Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
 <+>UTF-8
 ===================================================================
 diff --git a/public/app.js b/public/app.js
---- a/public/app.js	(revision c766181b76ed7026158bec073d5afabf58dedb64)
-+++ b/public/app.js	(date 1777144592179)
-@@ -9,6 +9,7 @@
+--- a/public/app.js	(revision a7fc85623129dfda01bbebc93c7bb10336e2adea)
++++ b/public/app.js	(date 1777196514184)
+@@ -4,8 +4,6 @@
+   const POLL_MAX_ATTEMPTS = 400; // ~10 minutes
+ 
+   const form = document.getElementById('patch-form');
+-  const tokenEl = document.getElementById('token');
+-  const patDescriptionEl = document.getElementById('pat-description');
    const coordinateEl = document.getElementById('coordinate');
    const commitMessageEl = document.getElementById('commit-message');
    const submitBtn = document.getElementById('submit-btn');
-+  const resetBtn = document.getElementById('reset-btn');
+@@ -18,17 +16,33 @@
+   const coordinatesConfirmBtn = document.getElementById('coordinates-confirm');
+   const coordinatesCancelBtn = document.getElementById('coordinates-cancel');
  
-   const openCoordinatesBtn = document.getElementById('open-coordinates-dialog');
-   const coordinatesDialog = document.getElementById('coordinates-dialog');
-@@ -50,6 +51,7 @@
++  const patFieldEl = document.getElementById('pat-field');
++  const patExpiredTagEl = document.getElementById('pat-expired-tag');
+   const patDisplayEl = document.getElementById('pat-display');
+   const openPatBtn = document.getElementById('open-pat-dialog');
+   const patDialog = document.getElementById('pat-dialog');
+-  const patDialogDescriptionEl = document.getElementById('pat-dialog-description');
+-  const patDialogTokenEl = document.getElementById('pat-dialog-token');
+-  const patDialogSaveBtn = document.getElementById('pat-dialog-save');
++  const patListEl = document.getElementById('pat-list');
++  const patListEmptyEl = document.getElementById('pat-list-empty');
++  const patAddNewBtn = document.getElementById('pat-add-new');
++  const patMainActionsEl = document.getElementById('pat-main-actions');
+   const patDialogCancelBtn = document.getElementById('pat-dialog-cancel');
++  const patDialogConfirmBtn = document.getElementById('pat-dialog-confirm');
++  const patEditFormEl = document.getElementById('pat-edit-form');
++  const patEditTitleEl = document.getElementById('pat-edit-title');
++  const patEditDescEl = document.getElementById('pat-dialog-description');
++  const patEditTokenEl = document.getElementById('pat-dialog-token');
++  const patEditExpiresEl = document.getElementById('pat-dialog-expires');
++  const patEditCancelBtn = document.getElementById('pat-edit-cancel');
++  const patEditSaveBtn = document.getElementById('pat-edit-save');
+ 
+   let savedCoordinates = [];
+   let dialogSelectedIdx = -1;
+ 
++  let pats = [];
++  let activePatId = null;
++  let patDialogSelectedId = null;
++  let patEditingId = null;
++
+   const dropZone = document.getElementById('drop-zone');
+   const fileInput = document.getElementById('patch-file');
+   const fileNameEl = document.getElementById('patch-file-name');
+@@ -46,12 +60,14 @@
+ 
+   loadSettings();
+   updatePatDisplay();
++  updateResetVisibility();
+   setupCoordinatesDialog();
+   setupPatDialog();
    setupDropZone();
  
    form.addEventListener('submit', onSubmit);
-+  resetBtn.addEventListener('click', resetAfterApply);
+-  resetBtn.addEventListener('click', resetAfterApply);
++  resetBtn.addEventListener('click', resetForm);
++  commitMessageEl.addEventListener('input', updateResetVisibility);
  
    function setupDropZone() {
      let depth = 0;
-@@ -441,6 +443,14 @@
+@@ -117,6 +133,7 @@
+     dropEmptyEl.hidden = true;
+     dropSelectedEl.hidden = false;
+     dropZone.classList.add('has-file');
++    updateResetVisibility();
+   }
+ 
+   function clearFile() {
+@@ -125,6 +142,7 @@
+     dropEmptyEl.hidden = false;
+     dropSelectedEl.hidden = true;
+     dropZone.classList.remove('has-file');
++    updateResetVisibility();
+   }
+ 
+   function hasFiles(ev) {
+@@ -141,30 +159,61 @@
+   function loadSettings() {
+     try {
+       const raw = localStorage.getItem(STORAGE_KEY);
+-      if (raw) {
+-        const saved = JSON.parse(raw);
+-        if (saved.token) tokenEl.value = saved.token;
+-        if (saved.description) patDescriptionEl.value = saved.description;
++      if (!raw) return;
++      const saved = JSON.parse(raw);
++
++      if (Array.isArray(saved.pats)) {
++        pats = saved.pats.map(normalizePat).filter((p) => p !== null);
++        activePatId = saved.activePatId && pats.some((p) => p.id === saved.activePatId)
++          ? saved.activePatId
++          : null;
++      } else if (saved.token) {
++        // Migration from the legacy { token, description } single-PAT format
++        const migrated = {
++          id: generateId(),
++          description: typeof saved.description === 'string' ? saved.description : '',
++          token: saved.token,
++          expiresAt: '',
++        };
++        pats = [migrated];
++        activePatId = migrated.id;
++      }
+ 
+-        if (Array.isArray(saved.coordinates)) {
+-          savedCoordinates = saved.coordinates
+-            .map(toCoordinateString)
+-            .filter((c) => c !== null);
+-        } else if (saved.repo && saved.branch) {
+-          // Migration from the legacy { token, repo, branch } format
+-          savedCoordinates = [`${saved.repo}:${saved.branch}`];
+-        }
++      if (Array.isArray(saved.coordinates)) {
++        savedCoordinates = saved.coordinates
++          .map(toCoordinateString)
++          .filter((c) => c !== null);
++      } else if (saved.repo && saved.branch) {
++        // Migration from the legacy { token, repo, branch } format
++        savedCoordinates = [`${saved.repo}:${saved.branch}`];
++      }
+ 
+-        if (savedCoordinates.length > 0 && !coordinateEl.value) {
+-          coordinateEl.value = savedCoordinates[0];
+-        }
++      if (savedCoordinates.length > 0 && !coordinateEl.value) {
++        coordinateEl.value = savedCoordinates[0];
+       }
+     } catch (_) {
+       // ignore corrupt storage
+     }
+   }
+ 
+-  function saveSettings() {
++  function normalizePat(p) {
++    if (!p || typeof p.token !== 'string' || !p.token) return null;
++    return {
++      id: typeof p.id === 'string' && p.id ? p.id : generateId(),
++      description: typeof p.description === 'string' ? p.description : '',
++      token: p.token,
++      expiresAt: typeof p.expiresAt === 'string' ? p.expiresAt : '',
++    };
++  }
++
++  function generateId() {
++    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
++      return crypto.randomUUID();
++    }
++    return `pat_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
++  }
++
++  function saveCoordinatesAndPersist() {
+     const coord = coordinateEl.value.trim();
+     if (coord && parseCoordinate(coord)) {
+       addOrPromoteCoordinate(coord);
+@@ -175,8 +224,8 @@
+   function persistSettings() {
+     try {
+       localStorage.setItem(STORAGE_KEY, JSON.stringify({
+-        token: tokenEl.value,
+-        description: patDescriptionEl.value,
++        pats,
++        activePatId,
+         coordinates: savedCoordinates,
+       }));
+     } catch (_) { /* quota exceeded, nothing to do */ }
+@@ -188,10 +237,21 @@
+     savedCoordinates.unshift(coord);
+   }
+ 
++  function getActivePat() {
++    return pats.find((p) => p.id === activePatId) || null;
++  }
++
++  function isPatExpired(pat) {
++    if (!pat || !pat.expiresAt) return false;
++    const today = new Date().toISOString().slice(0, 10);
++    return pat.expiresAt < today;
++  }
++
+   function setupPatDialog() {
+     openPatBtn.addEventListener('click', () => {
+-      patDialogDescriptionEl.value = patDescriptionEl.value;
+-      patDialogTokenEl.value = tokenEl.value;
++      patDialogSelectedId = activePatId;
++      hideEditForm();
++      renderPatList();
+       patDialog.showModal();
+     });
+ 
+@@ -199,28 +259,197 @@
+       patDialog.close();
+     });
+ 
+-    patDialogSaveBtn.addEventListener('click', () => {
+-      patDescriptionEl.value = patDialogDescriptionEl.value.trim();
+-      tokenEl.value = patDialogTokenEl.value.trim();
+-      updatePatDisplay();
++    patDialogConfirmBtn.addEventListener('click', () => {
++      if (patDialogSelectedId && pats.some((p) => p.id === patDialogSelectedId)) {
++        activePatId = patDialogSelectedId;
++        persistSettings();
++        updatePatDisplay();
++      }
++      patDialog.close();
++    });
++
++    patAddNewBtn.addEventListener('click', () => {
++      showEditForm(null);
++    });
++
++    patEditCancelBtn.addEventListener('click', () => {
++      hideEditForm();
++      renderPatList();
++    });
++
++    patEditSaveBtn.addEventListener('click', () => {
++      const desc = patEditDescEl.value.trim();
++      const token = patEditTokenEl.value.trim();
++      const expiresAt = patEditExpiresEl.value;
++      if (!token) {
++        patEditTokenEl.focus();
++        return;
++      }
++      if (patEditingId) {
++        const existing = pats.find((p) => p.id === patEditingId);
++        if (existing) {
++          existing.description = desc;
++          existing.token = token;
++          existing.expiresAt = expiresAt;
++        }
++      } else {
++        const created = {
++          id: generateId(),
++          description: desc,
++          token,
++          expiresAt,
++        };
++        pats.push(created);
++        if (!activePatId) {
++          activePatId = created.id;
++          patDialogSelectedId = created.id;
++        }
++      }
+       persistSettings();
+-      patDialog.close();
++      updatePatDisplay();
++      hideEditForm();
++      renderPatList();
++    });
++
++    patListEl.addEventListener('click', (ev) => {
++      const editBtn = ev.target.closest('.pat-edit');
++      if (editBtn) {
++        showEditForm(editBtn.dataset.id);
++        return;
++      }
++      const delBtn = ev.target.closest('.pat-delete');
++      if (delBtn) {
++        const id = delBtn.dataset.id;
++        const idx = pats.findIndex((p) => p.id === id);
++        if (idx < 0) return;
++        pats.splice(idx, 1);
++        if (activePatId === id) activePatId = null;
++        if (patDialogSelectedId === id) patDialogSelectedId = activePatId;
++        persistSettings();
++        updatePatDisplay();
++        renderPatList();
++        return;
++      }
++      const pickBtn = ev.target.closest('.pat-pick');
++      if (pickBtn) {
++        patDialogSelectedId = pickBtn.dataset.id;
++        renderPatList();
++      }
+     });
+   }
++
++  function showEditForm(id) {
++    patEditingId = id;
++    if (id) {
++      const pat = pats.find((p) => p.id === id);
++      if (!pat) return;
++      patEditTitleEl.textContent = 'Edit PAT';
++      patEditDescEl.value = pat.description;
++      patEditTokenEl.value = pat.token;
++      patEditExpiresEl.value = pat.expiresAt || '';
++    } else {
++      patEditTitleEl.textContent = 'New PAT';
++      patEditDescEl.value = '';
++      patEditTokenEl.value = '';
++      patEditExpiresEl.value = '';
++    }
++    patListEl.hidden = true;
++    patListEmptyEl.hidden = true;
++    patAddNewBtn.hidden = true;
++    patMainActionsEl.hidden = true;
++    patEditFormEl.hidden = false;
++  }
++
++  function hideEditForm() {
++    patEditingId = null;
++    patEditFormEl.hidden = true;
++    patAddNewBtn.hidden = false;
++    patMainActionsEl.hidden = false;
++  }
++
++  function renderPatList() {
++    patListEl.replaceChildren();
++    if (pats.length === 0) {
++      patListEmptyEl.hidden = false;
++      patListEl.hidden = true;
++      patDialogConfirmBtn.disabled = true;
++      return;
++    }
++    patListEmptyEl.hidden = true;
++    patListEl.hidden = false;
++
++    pats.forEach((pat) => {
++      const li = document.createElement('li');
++      const pick = document.createElement('button');
++      pick.type = 'button';
++      pick.className = 'pat-pick';
++      pick.dataset.id = pat.id;
++
++      const desc = document.createElement('span');
++      desc.className = 'pat-pick-desc';
++      desc.textContent = pat.description || '(no notes)';
++      if (!pat.description) desc.classList.add('is-empty');
++      pick.appendChild(desc);
++
++      if (pat.id === activePatId) {
++        const activeTag = document.createElement('span');
++        activeTag.className = 'pat-pick-active';
++        activeTag.textContent = '(active)';
++        pick.appendChild(activeTag);
++      }
++
++      if (isPatExpired(pat)) {
++        const expTag = document.createElement('span');
++        expTag.className = 'pat-pick-expired';
++        expTag.textContent = '(expired)';
++        pick.appendChild(expTag);
++      }
++
++      if (pat.id === patDialogSelectedId) pick.classList.add('is-selected');
++
++      const edit = document.createElement('button');
++      edit.type = 'button';
++      edit.className = 'pat-edit';
++      edit.dataset.id = pat.id;
++      edit.setAttribute('aria-label', `Edit ${pat.description || 'PAT'}`);
++      edit.textContent = 'edit';
++
++      const del = document.createElement('button');
++      del.type = 'button';
++      del.className = 'pat-delete';
++      del.dataset.id = pat.id;
++      del.setAttribute('aria-label', `Remove ${pat.description || 'PAT'}`);
++      del.textContent = '×';
++
++      li.appendChild(pick);
++      li.appendChild(edit);
++      li.appendChild(del);
++      patListEl.appendChild(li);
++    });
++
++    patDialogConfirmBtn.disabled =
++      !patDialogSelectedId
++      || patDialogSelectedId === activePatId
++      || !pats.some((p) => p.id === patDialogSelectedId);
++  }
+ 
+   function updatePatDisplay() {
+-    const desc = patDescriptionEl.value.trim();
+-    const hasToken = tokenEl.value.length > 0;
+-    if (!hasToken) {
++    const pat = getActivePat();
++    const expired = isPatExpired(pat);
++
++    if (!pat) {
+       patDisplayEl.textContent = '(no PAT set)';
+       patDisplayEl.classList.add('is-empty');
+-    } else if (desc) {
+-      patDisplayEl.textContent = desc;
++    } else if (pat.description) {
++      patDisplayEl.textContent = pat.description;
+       patDisplayEl.classList.remove('is-empty');
+     } else {
+       patDisplayEl.textContent = '(PAT set, no notes)';
+       patDisplayEl.classList.add('is-empty');
+     }
++
++    patFieldEl.classList.toggle('is-expired', expired);
++    patExpiredTagEl.hidden = !expired;
+   }
+ 
+   function setupCoordinatesDialog() {
+@@ -336,8 +565,9 @@
+ 
+   async function onSubmit(ev) {
+     ev.preventDefault();
+-    if (!tokenEl.value.trim()) {
+-      setStatus('failed', 'No GitHub PAT set', 'Click the edit icon to enter your PAT.');
++    const activePat = getActivePat();
++    if (!activePat || !activePat.token.trim()) {
++      setStatus('failed', 'No GitHub PAT set', 'Click the edit icon to add one.');
+       return;
+     }
+     if (!selectedFile) {
+@@ -349,7 +579,7 @@
+       setStatus('failed', 'Invalid coordinate', 'Expected format: owner/name:branch');
+       return;
+     }
+-    saveSettings();
++    saveCoordinatesAndPersist();
+     setStatus('running', 'Sending request...', '');
+     submitBtn.disabled = true;
+ 
+@@ -359,7 +589,7 @@
+         method: 'POST',
+         headers: {
+           'Content-Type': 'application/json',
+-          Authorization: `Bearer ${tokenEl.value.trim()}`,
++          Authorization: `Bearer ${activePat.token.trim()}`,
+         },
+         body: JSON.stringify({
+           repo: parsed.repo,
+@@ -443,14 +673,18 @@
      statusLine.className = `status-${kind}`;
      statusLine.textContent = line;
      statusDetail.textContent = detail || '';
-+    resetBtn.hidden = false;
+-    resetBtn.hidden = false;
 +  }
 +
-+  function resetAfterApply() {
-+    commitMessageEl.value = '';
-+    clearFile();
-+    statusBox.hidden = true;
-+    resetBtn.hidden = true;
++  function updateResetVisibility() {
++    const dirty = !!commitMessageEl.value || !!selectedFile;
++    resetBtn.hidden = !dirty;
+   }
+ 
+-  function resetAfterApply() {
++  function resetForm() {
+     commitMessageEl.value = '';
+     clearFile();
+     statusBox.hidden = true;
+-    resetBtn.hidden = true;
++    updateResetVisibility();
    }
  
    function sleep(ms) {
+Index: src/server.js
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/server.js b/src/server.js
+--- a/src/server.js	(revision a7fc85623129dfda01bbebc93c7bb10336e2adea)
++++ b/src/server.js	(date 1777197747367)
+@@ -1,4 +1,5 @@
+ const express = require('express');
++const fs = require('node:fs');
+ const path = require('node:path');
+ 
+ const { createJob, getJob, finishJob } = require('./jobsStore');
+@@ -8,8 +9,17 @@
+ 
+ const app = express();
+ 
++const publicDir = path.join(__dirname, '..', 'public');
++const pkgVersion = require('../package.json').version;
++const indexHtml = fs.readFileSync(path.join(publicDir, 'index.html'), 'utf8')
++  .replace(/<!--\s*version:[^>]*-->/, `<!-- version: ${pkgVersion} -->`);
++
++app.get(['/', '/index.html'], (_req, res) => {
++  res.type('html').send(indexHtml);
++});
++
+ app.use(express.json({ limit: '5mb' }));
+-app.use(express.static(path.join(__dirname, '..', 'public')));
++app.use(express.static(publicDir));
+ 
+ attachMcp(app);
+ 

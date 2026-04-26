@@ -1,9 +1,10 @@
 <!doctype html>
 <html lang="en">
 <head>
+  <!-- version: dev -->
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>github-proxy</title>
+  <title>GitHub Proxy</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -27,18 +28,16 @@
     </p>
 
     <form id="patch-form">
-      <div class="pat-field">
-        <span>GitHub PAT</span>
+      <div class="pat-field" id="pat-field">
+        <span class="pat-label">GitHub PAT<span id="pat-expired-tag" class="pat-expired-tag" hidden> (expired)</span></span>
         <div class="pat-row">
           <span class="pat-display is-empty" id="pat-display">(no PAT set)</span>
-          <button type="button" id="open-pat-dialog" class="icon-button" aria-label="Edit PAT" title="Edit PAT">
+          <button type="button" id="open-pat-dialog" class="icon-button" aria-label="Manage PATs" title="Manage PATs">
             <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor" />
             </svg>
           </button>
         </div>
-        <input type="hidden" id="token" />
-        <input type="hidden" id="pat-description" />
       </div>
 
       <label>
@@ -93,18 +92,36 @@
     </dialog>
 
     <dialog id="pat-dialog">
-      <h2>GitHub PAT</h2>
-      <label>
-        Notes (memo, not sent anywhere)
-        <input type="text" id="pat-dialog-description" placeholder="e.g. project-name, expires 2026-05-25" />
-      </label>
-      <label>
-        Token
-        <input type="password" id="pat-dialog-token" autocomplete="off" />
-      </label>
-      <div class="dialog-actions">
-        <button type="button" id="pat-dialog-cancel">Cancel</button>
-        <button type="button" id="pat-dialog-save">Save</button>
+      <h2>GitHub PATs</h2>
+
+      <p id="pat-list-empty" hidden>No PATs saved.</p>
+      <ul id="pat-list"></ul>
+
+      <button type="button" id="pat-add-new">+ Add new</button>
+
+      <div id="pat-edit-form" hidden>
+        <h3 id="pat-edit-title">New PAT</h3>
+        <label>
+          Description (memo, not sent anywhere)
+          <input type="text" id="pat-dialog-description" placeholder="e.g. project-name" />
+        </label>
+        <label>
+          Token
+          <input type="password" id="pat-dialog-token" autocomplete="off" />
+        </label>
+        <label>
+          Expires (blank = never)
+          <input type="date" id="pat-dialog-expires" />
+        </label>
+        <div class="dialog-actions">
+          <button type="button" id="pat-edit-cancel">Cancel</button>
+          <button type="button" id="pat-edit-save">Save</button>
+        </div>
+      </div>
+
+      <div class="dialog-actions" id="pat-main-actions">
+        <button type="button" id="pat-dialog-cancel">Close</button>
+        <button type="button" id="pat-dialog-confirm" disabled>Set as active</button>
       </div>
     </dialog>
   </main>

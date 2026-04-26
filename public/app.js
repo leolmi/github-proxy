@@ -4,8 +4,6 @@
   const POLL_MAX_ATTEMPTS = 400; // ~10 minutes
 
   const form = document.getElementById('patch-form');
-  const tokenEl = document.getElementById('token');
-  const patDescriptionEl = document.getElementById('pat-description');
   const coordinateEl = document.getElementById('coordinate');
   const commitMessageEl = document.getElementById('commit-message');
   const submitBtn = document.getElementById('submit-btn');
@@ -18,16 +16,32 @@
   const coordinatesConfirmBtn = document.getElementById('coordinates-confirm');
   const coordinatesCancelBtn = document.getElementById('coordinates-cancel');
 
+  const patFieldEl = document.getElementById('pat-field');
+  const patExpiredTagEl = document.getElementById('pat-expired-tag');
   const patDisplayEl = document.getElementById('pat-display');
   const openPatBtn = document.getElementById('open-pat-dialog');
   const patDialog = document.getElementById('pat-dialog');
-  const patDialogDescriptionEl = document.getElementById('pat-dialog-description');
-  const patDialogTokenEl = document.getElementById('pat-dialog-token');
-  const patDialogSaveBtn = document.getElementById('pat-dialog-save');
+  const patListEl = document.getElementById('pat-list');
+  const patListEmptyEl = document.getElementById('pat-list-empty');
+  const patAddNewBtn = document.getElementById('pat-add-new');
+  const patMainActionsEl = document.getElementById('pat-main-actions');
   const patDialogCancelBtn = document.getElementById('pat-dialog-cancel');
+  const patDialogConfirmBtn = document.getElementById('pat-dialog-confirm');
+  const patEditFormEl = document.getElementById('pat-edit-form');
+  const patEditTitleEl = document.getElementById('pat-edit-title');
+  const patEditDescEl = document.getElementById('pat-dialog-description');
+  const patEditTokenEl = document.getElementById('pat-dialog-token');
+  const patEditExpiresEl = document.getElementById('pat-dialog-expires');
+  const patEditCancelBtn = document.getElementById('pat-edit-cancel');
+  const patEditSaveBtn = document.getElementById('pat-edit-save');
 
   let savedCoordinates = [];
   let dialogSelectedIdx = -1;
+
+  let pats = [];
+  let activePatId = null;
+  let patDialogSelectedId = null;
+  let patEditingId = null;
 
   const dropZone = document.getElementById('drop-zone');
   const fileInput = document.getElementById('patch-file');
@@ -46,12 +60,14 @@
 
   loadSettings();
   updatePatDisplay();
+  updateResetVisibility();
   setupCoordinatesDialog();
   setupPatDialog();
   setupDropZone();
 
   form.addEventListener('submit', onSubmit);
-  resetBtn.addEventListener('click', resetAfterApply);
+  resetBtn.addEventListener('click', resetForm);
+  commitMessageEl.addEventListener('input', updateResetVisibility);
 
   function setupDropZone() {
     let depth = 0;
@@ -117,6 +133,7 @@
     dropEmptyEl.hidden = true;
     dropSelectedEl.hidden = false;
     dropZone.classList.add('has-file');
+    updateResetVisibility();
   }
 
   function clearFile() {
@@ -125,6 +142,7 @@
     dropEmptyEl.hidden = false;
     dropSelectedEl.hidden = true;
     dropZone.classList.remove('has-file');
+    updateResetVisibility();
   }
 
   function hasFiles(ev) {
@@ -141,30 +159,61 @@
   function loadSettings() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const saved = JSON.parse(raw);
-        if (saved.token) tokenEl.value = saved.token;
-        if (saved.description) patDescriptionEl.value = saved.description;
+      if (!raw) return;
+      const saved = JSON.parse(raw);
 
-        if (Array.isArray(saved.coordinates)) {
-          savedCoordinates = saved.coordinates
-            .map(toCoordinateString)
-            .filter((c) => c !== null);
-        } else if (saved.repo && saved.branch) {
-          // Migration from the legacy { token, repo, branch } format
-          savedCoordinates = [`${saved.repo}:${saved.branch}`];
-        }
+      if (Array.isArray(saved.pats)) {
+        pats = saved.pats.map(normalizePat).filter((p) => p !== null);
+        activePatId = saved.activePatId && pats.some((p) => p.id === saved.activePatId)
+          ? saved.activePatId
+          : null;
+      } else if (saved.token) {
+        // Migration from the legacy { token, description } single-PAT format
+        const migrated = {
+          id: generateId(),
+          description: typeof saved.description === 'string' ? saved.description : '',
+          token: saved.token,
+          expiresAt: '',
+        };
+        pats = [migrated];
+        activePatId = migrated.id;
+      }
 
-        if (savedCoordinates.length > 0 && !coordinateEl.value) {
-          coordinateEl.value = savedCoordinates[0];
-        }
+      if (Array.isArray(saved.coordinates)) {
+        savedCoordinates = saved.coordinates
+          .map(toCoordinateString)
+          .filter((c) => c !== null);
+      } else if (saved.repo && saved.branch) {
+        // Migration from the legacy { token, repo, branch } format
+        savedCoordinates = [`${saved.repo}:${saved.branch}`];
+      }
+
+      if (savedCoordinates.length > 0 && !coordinateEl.value) {
+        coordinateEl.value = savedCoordinates[0];
       }
     } catch (_) {
       // ignore corrupt storage
     }
   }
 
-  function saveSettings() {
+  function normalizePat(p) {
+    if (!p || typeof p.token !== 'string' || !p.token) return null;
+    return {
+      id: typeof p.id === 'string' && p.id ? p.id : generateId(),
+      description: typeof p.description === 'string' ? p.description : '',
+      token: p.token,
+      expiresAt: typeof p.expiresAt === 'string' ? p.expiresAt : '',
+    };
+  }
+
+  function generateId() {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    return `pat_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  }
+
+  function saveCoordinatesAndPersist() {
     const coord = coordinateEl.value.trim();
     if (coord && parseCoordinate(coord)) {
       addOrPromoteCoordinate(coord);
@@ -175,8 +224,8 @@
   function persistSettings() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        token: tokenEl.value,
-        description: patDescriptionEl.value,
+        pats,
+        activePatId,
         coordinates: savedCoordinates,
       }));
     } catch (_) { /* quota exceeded, nothing to do */ }
@@ -188,10 +237,21 @@
     savedCoordinates.unshift(coord);
   }
 
+  function getActivePat() {
+    return pats.find((p) => p.id === activePatId) || null;
+  }
+
+  function isPatExpired(pat) {
+    if (!pat || !pat.expiresAt) return false;
+    const today = new Date().toISOString().slice(0, 10);
+    return pat.expiresAt < today;
+  }
+
   function setupPatDialog() {
     openPatBtn.addEventListener('click', () => {
-      patDialogDescriptionEl.value = patDescriptionEl.value;
-      patDialogTokenEl.value = tokenEl.value;
+      patDialogSelectedId = activePatId;
+      hideEditForm();
+      renderPatList();
       patDialog.showModal();
     });
 
@@ -199,28 +259,197 @@
       patDialog.close();
     });
 
-    patDialogSaveBtn.addEventListener('click', () => {
-      patDescriptionEl.value = patDialogDescriptionEl.value.trim();
-      tokenEl.value = patDialogTokenEl.value.trim();
-      updatePatDisplay();
-      persistSettings();
+    patDialogConfirmBtn.addEventListener('click', () => {
+      if (patDialogSelectedId && pats.some((p) => p.id === patDialogSelectedId)) {
+        activePatId = patDialogSelectedId;
+        persistSettings();
+        updatePatDisplay();
+      }
       patDialog.close();
+    });
+
+    patAddNewBtn.addEventListener('click', () => {
+      showEditForm(null);
+    });
+
+    patEditCancelBtn.addEventListener('click', () => {
+      hideEditForm();
+      renderPatList();
+    });
+
+    patEditSaveBtn.addEventListener('click', () => {
+      const desc = patEditDescEl.value.trim();
+      const token = patEditTokenEl.value.trim();
+      const expiresAt = patEditExpiresEl.value;
+      if (!token) {
+        patEditTokenEl.focus();
+        return;
+      }
+      if (patEditingId) {
+        const existing = pats.find((p) => p.id === patEditingId);
+        if (existing) {
+          existing.description = desc;
+          existing.token = token;
+          existing.expiresAt = expiresAt;
+        }
+      } else {
+        const created = {
+          id: generateId(),
+          description: desc,
+          token,
+          expiresAt,
+        };
+        pats.push(created);
+        if (!activePatId) {
+          activePatId = created.id;
+          patDialogSelectedId = created.id;
+        }
+      }
+      persistSettings();
+      updatePatDisplay();
+      hideEditForm();
+      renderPatList();
+    });
+
+    patListEl.addEventListener('click', (ev) => {
+      const editBtn = ev.target.closest('.pat-edit');
+      if (editBtn) {
+        showEditForm(editBtn.dataset.id);
+        return;
+      }
+      const delBtn = ev.target.closest('.pat-delete');
+      if (delBtn) {
+        const id = delBtn.dataset.id;
+        const idx = pats.findIndex((p) => p.id === id);
+        if (idx < 0) return;
+        pats.splice(idx, 1);
+        if (activePatId === id) activePatId = null;
+        if (patDialogSelectedId === id) patDialogSelectedId = activePatId;
+        persistSettings();
+        updatePatDisplay();
+        renderPatList();
+        return;
+      }
+      const pickBtn = ev.target.closest('.pat-pick');
+      if (pickBtn) {
+        patDialogSelectedId = pickBtn.dataset.id;
+        renderPatList();
+      }
     });
   }
 
+  function showEditForm(id) {
+    patEditingId = id;
+    if (id) {
+      const pat = pats.find((p) => p.id === id);
+      if (!pat) return;
+      patEditTitleEl.textContent = 'Edit PAT';
+      patEditDescEl.value = pat.description;
+      patEditTokenEl.value = pat.token;
+      patEditExpiresEl.value = pat.expiresAt || '';
+    } else {
+      patEditTitleEl.textContent = 'New PAT';
+      patEditDescEl.value = '';
+      patEditTokenEl.value = '';
+      patEditExpiresEl.value = '';
+    }
+    patListEl.hidden = true;
+    patListEmptyEl.hidden = true;
+    patAddNewBtn.hidden = true;
+    patMainActionsEl.hidden = true;
+    patEditFormEl.hidden = false;
+  }
+
+  function hideEditForm() {
+    patEditingId = null;
+    patEditFormEl.hidden = true;
+    patAddNewBtn.hidden = false;
+    patMainActionsEl.hidden = false;
+  }
+
+  function renderPatList() {
+    patListEl.replaceChildren();
+    if (pats.length === 0) {
+      patListEmptyEl.hidden = false;
+      patListEl.hidden = true;
+      patDialogConfirmBtn.disabled = true;
+      return;
+    }
+    patListEmptyEl.hidden = true;
+    patListEl.hidden = false;
+
+    pats.forEach((pat) => {
+      const li = document.createElement('li');
+      const pick = document.createElement('button');
+      pick.type = 'button';
+      pick.className = 'pat-pick';
+      pick.dataset.id = pat.id;
+
+      const desc = document.createElement('span');
+      desc.className = 'pat-pick-desc';
+      desc.textContent = pat.description || '(no notes)';
+      if (!pat.description) desc.classList.add('is-empty');
+      pick.appendChild(desc);
+
+      if (pat.id === activePatId) {
+        const activeTag = document.createElement('span');
+        activeTag.className = 'pat-pick-active';
+        activeTag.textContent = '(active)';
+        pick.appendChild(activeTag);
+      }
+
+      if (isPatExpired(pat)) {
+        const expTag = document.createElement('span');
+        expTag.className = 'pat-pick-expired';
+        expTag.textContent = '(expired)';
+        pick.appendChild(expTag);
+      }
+
+      if (pat.id === patDialogSelectedId) pick.classList.add('is-selected');
+
+      const edit = document.createElement('button');
+      edit.type = 'button';
+      edit.className = 'pat-edit';
+      edit.dataset.id = pat.id;
+      edit.setAttribute('aria-label', `Edit ${pat.description || 'PAT'}`);
+      edit.textContent = 'edit';
+
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'pat-delete';
+      del.dataset.id = pat.id;
+      del.setAttribute('aria-label', `Remove ${pat.description || 'PAT'}`);
+      del.textContent = '×';
+
+      li.appendChild(pick);
+      li.appendChild(edit);
+      li.appendChild(del);
+      patListEl.appendChild(li);
+    });
+
+    patDialogConfirmBtn.disabled =
+      !patDialogSelectedId
+      || patDialogSelectedId === activePatId
+      || !pats.some((p) => p.id === patDialogSelectedId);
+  }
+
   function updatePatDisplay() {
-    const desc = patDescriptionEl.value.trim();
-    const hasToken = tokenEl.value.length > 0;
-    if (!hasToken) {
+    const pat = getActivePat();
+    const expired = isPatExpired(pat);
+
+    if (!pat) {
       patDisplayEl.textContent = '(no PAT set)';
       patDisplayEl.classList.add('is-empty');
-    } else if (desc) {
-      patDisplayEl.textContent = desc;
+    } else if (pat.description) {
+      patDisplayEl.textContent = pat.description;
       patDisplayEl.classList.remove('is-empty');
     } else {
       patDisplayEl.textContent = '(PAT set, no notes)';
       patDisplayEl.classList.add('is-empty');
     }
+
+    patFieldEl.classList.toggle('is-expired', expired);
+    patExpiredTagEl.hidden = !expired;
   }
 
   function setupCoordinatesDialog() {
@@ -336,8 +565,9 @@
 
   async function onSubmit(ev) {
     ev.preventDefault();
-    if (!tokenEl.value.trim()) {
-      setStatus('failed', 'No GitHub PAT set', 'Click the edit icon to enter your PAT.');
+    const activePat = getActivePat();
+    if (!activePat || !activePat.token.trim()) {
+      setStatus('failed', 'No GitHub PAT set', 'Click the edit icon to add one.');
       return;
     }
     if (!selectedFile) {
@@ -349,7 +579,7 @@
       setStatus('failed', 'Invalid coordinate', 'Expected format: owner/name:branch');
       return;
     }
-    saveSettings();
+    saveCoordinatesAndPersist();
     setStatus('running', 'Sending request...', '');
     submitBtn.disabled = true;
 
@@ -359,7 +589,7 @@
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${tokenEl.value.trim()}`,
+          Authorization: `Bearer ${activePat.token.trim()}`,
         },
         body: JSON.stringify({
           repo: parsed.repo,
@@ -443,14 +673,18 @@
     statusLine.className = `status-${kind}`;
     statusLine.textContent = line;
     statusDetail.textContent = detail || '';
-    resetBtn.hidden = false;
   }
 
-  function resetAfterApply() {
+  function updateResetVisibility() {
+    const dirty = !!commitMessageEl.value || !!selectedFile;
+    resetBtn.hidden = !dirty;
+  }
+
+  function resetForm() {
     commitMessageEl.value = '';
     clearFile();
     statusBox.hidden = true;
-    resetBtn.hidden = true;
+    updateResetVisibility();
   }
 
   function sleep(ms) {

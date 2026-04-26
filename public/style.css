@@ -114,6 +114,17 @@ textarea {
   font-style: italic;
 }
 
+.pat-field.is-expired > .pat-label,
+.pat-expired-tag {
+  color: #c92a2a;
+  font-weight: 600;
+}
+
+.pat-field.is-expired .pat-display {
+  border-color: #c92a2a;
+  background: rgba(201, 42, 42, 0.08);
+}
+
 #pat-dialog {
   border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
   border-radius: 6px;
@@ -228,6 +239,108 @@ textarea {
   padding: 0.4rem 0.6rem;
   font-size: 1rem;
   line-height: 1;
+}
+
+#pat-list {
+  list-style: none;
+  margin: 0 0 0.6rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+#pat-list li {
+  display: flex;
+  gap: 0.4rem;
+}
+
+#pat-list-empty {
+  margin: 0 0 0.6rem;
+  opacity: 0.7;
+  font-size: 0.9rem;
+}
+
+.pat-pick {
+  flex: 1;
+  text-align: left;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.85rem;
+  border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem;
+}
+
+.pat-pick:hover,
+.pat-pick:focus-visible {
+  border-color: currentColor;
+  outline: none;
+}
+
+.pat-pick.is-selected {
+  border-color: currentColor;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+.pat-pick-desc.is-empty {
+  font-style: italic;
+  opacity: 0.7;
+}
+
+.pat-pick-active {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.pat-pick-expired {
+  font-size: 0.75rem;
+  color: #c92a2a;
+  font-weight: 600;
+}
+
+.pat-edit,
+.pat-delete {
+  padding: 0.4rem 0.55rem;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+#pat-add-new {
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.7rem;
+}
+
+#pat-edit-form h3 {
+  margin: 0 0 0.6rem;
+  font-size: 0.95rem;
+}
+
+#pat-edit-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.8rem;
+  font-size: 0.85rem;
+}
+
+#pat-edit-form input[type="text"],
+#pat-edit-form input[type="password"],
+#pat-edit-form input[type="date"] {
+  font: inherit;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
 }
 
 .dialog-actions {

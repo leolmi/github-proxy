@@ -1,4 +1,5 @@
 const express = require('express');
+const fs = require('node:fs');
 const path = require('node:path');
 
 const { createJob, getJob, finishJob } = require('./jobsStore');
@@ -8,8 +9,17 @@ const { attachMcp } = require('./mcpServer');
 
 const app = express();
 
+const publicDir = path.join(__dirname, '..', 'public');
+const pkgVersion = require('../package.json').version;
+const indexHtml = fs.readFileSync(path.join(publicDir, 'index.html'), 'utf8')
+  .replace(/<!--\s*version:[^>]*-->/, `<!-- version: ${pkgVersion} -->`);
+
+app.get(['/', '/index.html'], (_req, res) => {
+  res.type('html').send(indexHtml);
+});
+
 app.use(express.json({ limit: '5mb' }));
-app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use(express.static(publicDir));
 
 attachMcp(app);
 
