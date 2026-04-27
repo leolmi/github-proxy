@@ -30,26 +30,22 @@
     <form id="patch-form">
       <div class="pat-field" id="pat-field">
         <span class="pat-label">GitHub PAT<span id="pat-expired-tag" class="pat-expired-tag" hidden> (expired)</span></span>
-        <div class="pat-row">
-          <span class="pat-display is-empty" id="pat-display">(no PAT set)</span>
-          <button type="button" id="open-pat-dialog" class="icon-button" aria-label="Manage PATs" title="Manage PATs">
-            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor" />
-            </svg>
-          </button>
-        </div>
+        <button type="button" id="pat-display" class="pat-display is-empty" aria-label="Manage PATs" title="Manage PATs">
+          <span class="pat-display-text">(no PAT set)</span>
+          <svg class="pat-display-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor" />
+          </svg>
+        </button>
       </div>
 
       <div class="coord-field" id="coord-field">
         <span class="coord-label">Coordinate (owner/name:branch)</span>
-        <div class="coord-row">
-          <span class="coord-display is-empty" id="coord-display">(no coordinate set)</span>
-          <button type="button" id="open-coordinates-dialog" class="icon-button" aria-label="Manage coordinates" title="Manage coordinates">
-            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor" />
-            </svg>
-          </button>
-        </div>
+        <button type="button" id="coord-display" class="coord-display is-empty" aria-label="Manage coordinates" title="Manage coordinates">
+          <span class="coord-display-text">(no coordinate set)</span>
+          <svg class="coord-display-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor" />
+          </svg>
+        </button>
       </div>
 
       <label>

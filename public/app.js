@@ -11,7 +11,7 @@
 
   const coordFieldEl = document.getElementById('coord-field');
   const coordDisplayEl = document.getElementById('coord-display');
-  const openCoordinatesBtn = document.getElementById('open-coordinates-dialog');
+  const coordDisplayTextEl = coordDisplayEl.querySelector('.coord-display-text');
   const coordinatesDialog = document.getElementById('coordinates-dialog');
   const coordinatesListEl = document.getElementById('coordinates-list');
   const coordinatesEmptyEl = document.getElementById('coordinates-empty');
@@ -28,7 +28,7 @@
   const patFieldEl = document.getElementById('pat-field');
   const patExpiredTagEl = document.getElementById('pat-expired-tag');
   const patDisplayEl = document.getElementById('pat-display');
-  const openPatBtn = document.getElementById('open-pat-dialog');
+  const patDisplayTextEl = patDisplayEl.querySelector('.pat-display-text');
   const patDialog = document.getElementById('pat-dialog');
   const patListEl = document.getElementById('pat-list');
   const patListEmptyEl = document.getElementById('pat-list-empty');
@@ -257,7 +257,7 @@
   }
 
   function setupPatDialog() {
-    openPatBtn.addEventListener('click', () => {
+    patDisplayEl.addEventListener('click', () => {
       patDialogSelectedId = activePatId;
       hidePatEditForm();
       renderPatList();
@@ -447,13 +447,13 @@
     const expired = isPatExpired(pat);
 
     if (!pat) {
-      patDisplayEl.textContent = '(no PAT set)';
+      patDisplayTextEl.textContent = '(no PAT set)';
       patDisplayEl.classList.add('is-empty');
     } else if (pat.description) {
-      patDisplayEl.textContent = pat.description;
+      patDisplayTextEl.textContent = pat.description;
       patDisplayEl.classList.remove('is-empty');
     } else {
-      patDisplayEl.textContent = '(PAT set, no notes)';
+      patDisplayTextEl.textContent = '(PAT set, no notes)';
       patDisplayEl.classList.add('is-empty');
     }
 
@@ -463,7 +463,7 @@
   }
 
   function setupCoordinatesDialog() {
-    openCoordinatesBtn.addEventListener('click', () => {
+    coordDisplayEl.addEventListener('click', () => {
       coordDialogSelected = activeCoordinate;
       hideCoordEditForm();
       renderCoordinatesDialog();
@@ -630,10 +630,10 @@
 
   function updateCoordinateDisplay() {
     if (activeCoordinate) {
-      coordDisplayEl.textContent = activeCoordinate;
+      coordDisplayTextEl.textContent = activeCoordinate;
       coordDisplayEl.classList.remove('is-empty');
     } else {
-      coordDisplayEl.textContent = '(no coordinate set)';
+      coordDisplayTextEl.textContent = '(no coordinate set)';
       coordDisplayEl.classList.add('is-empty');
     }
     updateSubmitState();
