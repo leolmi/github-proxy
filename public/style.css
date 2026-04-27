@@ -137,6 +137,12 @@ textarea {
   font-style: italic;
 }
 
+.pat-display-expires {
+  margin-left: 0.5rem;
+  opacity: 0.4;
+  font-style: normal;
+}
+
 .pat-field.is-expired > .pat-label,
 .pat-expired-tag {
   color: #c92a2a;

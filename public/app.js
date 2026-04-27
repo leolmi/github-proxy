@@ -442,19 +442,33 @@
       || !pats.some((p) => p.id === patDialogSelectedId);
   }
 
+  function formatExpiresDate(iso) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+    return m ? `${m[3]}/${m[2]}/${m[1]}` : iso;
+  }
+
   function updatePatDisplay() {
     const pat = getActivePat();
     const expired = isPatExpired(pat);
 
+    patDisplayTextEl.textContent = '';
     if (!pat) {
-      patDisplayTextEl.textContent = '(no PAT set)';
+      patDisplayTextEl.append('(no PAT set)');
       patDisplayEl.classList.add('is-empty');
-    } else if (pat.description) {
-      patDisplayTextEl.textContent = pat.description;
-      patDisplayEl.classList.remove('is-empty');
     } else {
-      patDisplayTextEl.textContent = '(PAT set, no notes)';
-      patDisplayEl.classList.add('is-empty');
+      if (pat.description) {
+        patDisplayTextEl.append(pat.description);
+        patDisplayEl.classList.remove('is-empty');
+      } else {
+        patDisplayTextEl.append('(PAT set, no notes)');
+        patDisplayEl.classList.add('is-empty');
+      }
+      if (pat.expiresAt) {
+        const expEl = document.createElement('span');
+        expEl.className = 'pat-display-expires';
+        expEl.textContent = formatExpiresDate(pat.expiresAt);
+        patDisplayTextEl.append(expEl);
+      }
     }
 
     patFieldEl.classList.toggle('is-expired', expired);
