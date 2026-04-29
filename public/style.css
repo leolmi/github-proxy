@@ -75,16 +75,14 @@ textarea {
   font-size: 0.9rem;
 }
 
-.pat-field,
-.coord-field {
+.entry-field {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
   font-size: 0.9rem;
 }
 
-.pat-display,
-.coord-display {
+.entry-display {
   align-self: stretch;
   width: 100%;
   display: flex;
@@ -100,16 +98,13 @@ textarea {
   cursor: pointer;
 }
 
-.pat-display:hover,
-.coord-display:hover,
-.pat-display:focus-visible,
-.coord-display:focus-visible {
+.entry-display:hover,
+.entry-display:focus-visible {
   border-color: currentColor;
   outline: none;
 }
 
-.pat-display-text,
-.coord-display-text {
+.entry-display-text {
   flex: 1;
   min-width: 0;
   white-space: nowrap;
@@ -117,44 +112,53 @@ textarea {
   text-overflow: ellipsis;
 }
 
-.pat-display-icon,
-.coord-display-icon {
+.entry-display-icon {
   flex-shrink: 0;
   margin-left: auto;
   opacity: 0.7;
 }
 
-.pat-display:hover .pat-display-icon,
-.coord-display:hover .coord-display-icon,
-.pat-display:focus-visible .pat-display-icon,
-.coord-display:focus-visible .coord-display-icon {
+.entry-display:hover .entry-display-icon,
+.entry-display:focus-visible .entry-display-icon {
   opacity: 1;
 }
 
-.pat-display.is-empty .pat-display-text,
-.coord-display.is-empty .coord-display-text {
+.entry-display.is-empty .entry-display-text {
   opacity: 0.55;
   font-style: italic;
 }
 
-.pat-display-expires {
+.entry-display-coord {
+  margin-left: 0.5rem;
+  opacity: 0.7;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.85em;
+}
+
+.entry-display-coord.is-empty {
+  opacity: 0.45;
+  font-style: italic;
+  font-family: inherit;
+}
+
+.entry-display-expires {
   margin-left: 0.5rem;
   opacity: 0.4;
   font-style: normal;
 }
 
-.pat-field.is-expired > .pat-label,
-.pat-expired-tag {
+.entry-field.is-expired > .entry-label,
+.entry-expired-tag {
   color: #c92a2a;
   font-weight: 600;
 }
 
-.pat-field.is-expired .pat-display {
+.entry-field.is-expired .entry-display {
   border-color: #c92a2a;
   background: rgba(201, 42, 42, 0.08);
 }
 
-#pat-dialog {
+#entries-dialog {
   border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
   border-radius: 6px;
   padding: 1.1rem 1.2rem;
@@ -164,16 +168,16 @@ textarea {
   color: CanvasText;
 }
 
-#pat-dialog::backdrop {
+#entries-dialog::backdrop {
   background: rgba(0, 0, 0, 0.4);
 }
 
-#pat-dialog h2 {
+#entries-dialog h2 {
   margin: 0 0 0.9rem;
   font-size: 1rem;
 }
 
-#pat-dialog label {
+#entries-dialog label {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
@@ -181,8 +185,9 @@ textarea {
   font-size: 0.85rem;
 }
 
-#pat-dialog input[type="text"],
-#pat-dialog input[type="password"] {
+#entries-dialog input[type="text"],
+#entries-dialog input[type="password"],
+#entries-dialog input[type="date"] {
   font: inherit;
   padding: 0.45rem 0.55rem;
   border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
@@ -191,120 +196,7 @@ textarea {
   color: inherit;
 }
 
-#coordinates-dialog {
-  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
-  border-radius: 6px;
-  padding: 1.1rem 1.2rem;
-  max-width: 460px;
-  width: calc(100% - 2rem);
-  background: Canvas;
-  color: CanvasText;
-}
-
-#coordinates-dialog::backdrop {
-  background: rgba(0, 0, 0, 0.4);
-}
-
-#coordinates-dialog h2 {
-  margin: 0 0 0.8rem;
-  font-size: 1rem;
-}
-
-#coordinates-list {
-  list-style: none;
-  margin: 0 0 1rem;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  max-height: 50vh;
-  overflow-y: auto;
-}
-
-#coordinates-list li {
-  display: flex;
-  gap: 0.4rem;
-}
-
-#coordinates-empty {
-  margin: 0 0 1rem;
-  opacity: 0.7;
-  font-size: 0.9rem;
-}
-
-.coord-pick {
-  flex: 1;
-  text-align: left;
-  padding: 0.45rem 0.6rem;
-  font-family: ui-monospace, Menlo, Consolas, monospace;
-  font-size: 0.85rem;
-  border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
-  border-radius: 4px;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-}
-
-.coord-pick:hover,
-.coord-pick:focus-visible {
-  border-color: currentColor;
-  outline: none;
-}
-
-.coord-pick.is-selected {
-  border-color: currentColor;
-  background: color-mix(in srgb, currentColor 8%, transparent);
-}
-
-.coord-delete {
-  padding: 0.4rem 0.55rem;
-  font-size: 0.85rem;
-  line-height: 1;
-}
-
-.coord-edit {
-  padding: 0.4rem 0.55rem;
-  font-size: 0.85rem;
-  line-height: 1;
-}
-
-.coord-pick-active {
-  font-size: 0.75rem;
-  opacity: 0.7;
-  margin-left: 0.5rem;
-  font-family: system-ui, sans-serif;
-}
-
-#coord-add-new {
-  margin: 0 0 1rem;
-  font-size: 0.85rem;
-  padding: 0.4rem 0.7rem;
-}
-
-#coord-edit-form h3 {
-  margin: 0 0 0.6rem;
-  font-size: 0.95rem;
-}
-
-#coord-edit-form label {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  margin-bottom: 0.8rem;
-  font-size: 0.85rem;
-}
-
-#coord-edit-form input[type="text"] {
-  font: inherit;
-  padding: 0.45rem 0.55rem;
-  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
-  border-radius: 4px;
-  background: transparent;
-  color: inherit;
-  font-family: ui-monospace, Menlo, Consolas, monospace;
-}
-
-#pat-list {
+#entries-list {
   list-style: none;
   margin: 0 0 0.6rem;
   padding: 0;
@@ -315,18 +207,18 @@ textarea {
   overflow-y: auto;
 }
 
-#pat-list li {
+#entries-list li {
   display: flex;
   gap: 0.4rem;
 }
 
-#pat-list-empty {
+#entries-empty {
   margin: 0 0 0.6rem;
   opacity: 0.7;
   font-size: 0.9rem;
 }
 
-.pat-pick {
+.entry-pick {
   flex: 1;
   text-align: left;
   padding: 0.45rem 0.6rem;
@@ -342,52 +234,64 @@ textarea {
   gap: 0.25rem;
 }
 
-.pat-pick:hover,
-.pat-pick:focus-visible {
+.entry-pick:hover,
+.entry-pick:focus-visible {
   border-color: currentColor;
   outline: none;
 }
 
-.pat-pick.is-selected {
+.entry-pick.is-selected {
   border-color: currentColor;
   background: color-mix(in srgb, currentColor 8%, transparent);
 }
 
-.pat-pick-desc.is-empty {
+.entry-pick-desc.is-empty {
   font-style: italic;
   opacity: 0.7;
 }
 
-.pat-pick-active {
+.entry-pick-coord {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+.entry-pick-coord.is-empty {
+  font-family: inherit;
+  font-style: italic;
+  opacity: 0.5;
+}
+
+.entry-pick-active {
   font-size: 0.75rem;
   opacity: 0.7;
 }
 
-.pat-pick-expired {
+.entry-pick-expired {
   font-size: 0.75rem;
   color: #c92a2a;
   font-weight: 600;
 }
 
-.pat-edit,
-.pat-delete {
+.entry-edit,
+.entry-delete {
   padding: 0.4rem 0.55rem;
   font-size: 0.85rem;
   line-height: 1;
 }
 
-#pat-add-new {
+#entry-add-new {
   margin: 0 0 1rem;
   font-size: 0.85rem;
   padding: 0.4rem 0.7rem;
 }
 
-#pat-edit-form h3 {
+#entry-edit-form h3 {
   margin: 0 0 0.6rem;
   font-size: 0.95rem;
 }
 
-#pat-edit-form label {
+#entry-edit-form label {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
@@ -395,15 +299,8 @@ textarea {
   font-size: 0.85rem;
 }
 
-#pat-edit-form input[type="text"],
-#pat-edit-form input[type="password"],
-#pat-edit-form input[type="date"] {
-  font: inherit;
-  padding: 0.45rem 0.55rem;
-  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
-  border-radius: 4px;
-  background: transparent;
-  color: inherit;
+#entry-edit-form input[type="text"][id="entry-edit-coord"] {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
 }
 
 .dialog-actions {
@@ -444,8 +341,7 @@ textarea {
 
 #commit-message.is-warn,
 .drop-zone.is-warn:not(.is-dragging):not(.has-file),
-.pat-display.is-warn,
-.coord-display.is-warn {
+.entry-display.is-warn {
   border-color: orange;
 }
 

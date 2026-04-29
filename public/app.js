@@ -9,50 +9,30 @@
   const submitHintEl = document.getElementById('submit-hint');
   const resetBtn = document.getElementById('reset-btn');
 
-  const coordFieldEl = document.getElementById('coord-field');
-  const coordDisplayEl = document.getElementById('coord-display');
-  const coordDisplayTextEl = coordDisplayEl.querySelector('.coord-display-text');
-  const coordinatesDialog = document.getElementById('coordinates-dialog');
-  const coordinatesListEl = document.getElementById('coordinates-list');
-  const coordinatesEmptyEl = document.getElementById('coordinates-empty');
-  const coordAddNewBtn = document.getElementById('coord-add-new');
-  const coordMainActionsEl = document.getElementById('coord-main-actions');
-  const coordinatesCancelBtn = document.getElementById('coordinates-cancel');
-  const coordinatesConfirmBtn = document.getElementById('coordinates-confirm');
-  const coordEditFormEl = document.getElementById('coord-edit-form');
-  const coordEditTitleEl = document.getElementById('coord-edit-title');
-  const coordEditInputEl = document.getElementById('coord-edit-input');
-  const coordEditCancelBtn = document.getElementById('coord-edit-cancel');
-  const coordEditSaveBtn = document.getElementById('coord-edit-save');
+  const entryFieldEl = document.getElementById('entry-field');
+  const entryExpiredTagEl = document.getElementById('entry-expired-tag');
+  const entryDisplayEl = document.getElementById('entry-display');
+  const entryDisplayTextEl = entryDisplayEl.querySelector('.entry-display-text');
+  const entriesDialog = document.getElementById('entries-dialog');
+  const entriesListEl = document.getElementById('entries-list');
+  const entriesEmptyEl = document.getElementById('entries-empty');
+  const entryAddNewBtn = document.getElementById('entry-add-new');
+  const entryMainActionsEl = document.getElementById('entry-main-actions');
+  const entriesCancelBtn = document.getElementById('entries-cancel');
+  const entriesConfirmBtn = document.getElementById('entries-confirm');
+  const entryEditFormEl = document.getElementById('entry-edit-form');
+  const entryEditTitleEl = document.getElementById('entry-edit-title');
+  const entryEditDescEl = document.getElementById('entry-edit-description');
+  const entryEditTokenEl = document.getElementById('entry-edit-token');
+  const entryEditExpiresEl = document.getElementById('entry-edit-expires');
+  const entryEditCoordEl = document.getElementById('entry-edit-coord');
+  const entryEditCancelBtn = document.getElementById('entry-edit-cancel');
+  const entryEditSaveBtn = document.getElementById('entry-edit-save');
 
-  const patFieldEl = document.getElementById('pat-field');
-  const patExpiredTagEl = document.getElementById('pat-expired-tag');
-  const patDisplayEl = document.getElementById('pat-display');
-  const patDisplayTextEl = patDisplayEl.querySelector('.pat-display-text');
-  const patDialog = document.getElementById('pat-dialog');
-  const patListEl = document.getElementById('pat-list');
-  const patListEmptyEl = document.getElementById('pat-list-empty');
-  const patAddNewBtn = document.getElementById('pat-add-new');
-  const patMainActionsEl = document.getElementById('pat-main-actions');
-  const patDialogCancelBtn = document.getElementById('pat-dialog-cancel');
-  const patDialogConfirmBtn = document.getElementById('pat-dialog-confirm');
-  const patEditFormEl = document.getElementById('pat-edit-form');
-  const patEditTitleEl = document.getElementById('pat-edit-title');
-  const patEditDescEl = document.getElementById('pat-dialog-description');
-  const patEditTokenEl = document.getElementById('pat-dialog-token');
-  const patEditExpiresEl = document.getElementById('pat-dialog-expires');
-  const patEditCancelBtn = document.getElementById('pat-edit-cancel');
-  const patEditSaveBtn = document.getElementById('pat-edit-save');
-
-  let savedCoordinates = [];
-  let activeCoordinate = null;
-  let coordDialogSelected = null;
-  let coordEditingIdx = -1;
-
-  let pats = [];
-  let activePatId = null;
-  let patDialogSelectedId = null;
-  let patEditingId = null;
+  let entries = [];
+  let activeEntryId = null;
+  let dialogSelectedId = null;
+  let editingId = null;
 
   const dropZone = document.getElementById('drop-zone');
   const fileInput = document.getElementById('patch-file');
@@ -70,12 +50,10 @@
   document.getElementById('mcp-endpoint').textContent = `${location.origin}/mcp`;
 
   loadSettings();
-  updatePatDisplay();
-  updateCoordinateDisplay();
+  updateEntryDisplay();
   updateResetVisibility();
   updateSubmitState();
-  setupCoordinatesDialog();
-  setupPatDialog();
+  setupEntriesDialog();
   setupDropZone();
 
   form.addEventListener('submit', onSubmit);
@@ -175,56 +153,79 @@
   }
 
   function loadSettings() {
+    let raw;
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const saved = JSON.parse(raw);
-
-      if (Array.isArray(saved.pats)) {
-        pats = saved.pats.map(normalizePat).filter((p) => p !== null);
-        activePatId = saved.activePatId && pats.some((p) => p.id === saved.activePatId)
-          ? saved.activePatId
-          : null;
-      } else if (saved.token) {
-        // Migration from the legacy { token, description } single-PAT format
-        const migrated = {
-          id: generateId(),
-          description: typeof saved.description === 'string' ? saved.description : '',
-          token: saved.token,
-          expiresAt: '',
-        };
-        pats = [migrated];
-        activePatId = migrated.id;
-      }
-
-      if (Array.isArray(saved.coordinates)) {
-        savedCoordinates = saved.coordinates
-          .map(toCoordinateString)
-          .filter((c) => c !== null && parseCoordinate(c) !== null);
-      } else if (saved.repo && saved.branch) {
-        // Migration from the legacy { token, repo, branch } format
-        savedCoordinates = [`${saved.repo}:${saved.branch}`];
-      }
-
-      if (typeof saved.activeCoordinate === 'string'
-          && savedCoordinates.includes(saved.activeCoordinate)) {
-        activeCoordinate = saved.activeCoordinate;
-      } else if (savedCoordinates.length > 0) {
-        // Migration: previously the first item was implicitly active.
-        activeCoordinate = savedCoordinates[0];
-      }
+      raw = localStorage.getItem(STORAGE_KEY);
     } catch (_) {
-      // ignore corrupt storage
+      return;
+    }
+    if (!raw) return;
+
+    let saved;
+    try {
+      saved = JSON.parse(raw);
+    } catch (_) {
+      return;
+    }
+
+    if (Array.isArray(saved.entries)) {
+      entries = saved.entries.map(normalizeEntry).filter((e) => e !== null);
+      activeEntryId = saved.activeEntryId && entries.some((e) => e.id === saved.activeEntryId)
+        ? saved.activeEntryId
+        : null;
+      return;
+    }
+
+    // Legacy migration: keep PAT info, drop coordinates (user will re-add).
+    const migrated = migrateLegacy(saved);
+    if (migrated.entries.length > 0) {
+      entries = migrated.entries;
+      activeEntryId = migrated.activeEntryId;
+      persistSettings();
     }
   }
 
-  function normalizePat(p) {
-    if (!p || typeof p.token !== 'string' || !p.token) return null;
-    return {
+  function migrateLegacy(saved) {
+    let oldPats = [];
+    if (Array.isArray(saved.pats)) {
+      oldPats = saved.pats.filter((p) => p && typeof p.token === 'string' && p.token);
+    } else if (typeof saved.token === 'string' && saved.token) {
+      oldPats = [{
+        id: generateId(),
+        description: typeof saved.description === 'string' ? saved.description : '',
+        token: saved.token,
+        expiresAt: '',
+      }];
+    }
+
+    const migratedEntries = oldPats.map((p) => ({
       id: typeof p.id === 'string' && p.id ? p.id : generateId(),
       description: typeof p.description === 'string' ? p.description : '',
       token: p.token,
       expiresAt: typeof p.expiresAt === 'string' ? p.expiresAt : '',
+      repo: '',
+      branch: '',
+    }));
+
+    let migratedActiveId = null;
+    if (saved.activePatId && migratedEntries.some((e) => e.id === saved.activePatId)) {
+      migratedActiveId = saved.activePatId;
+    } else if (migratedEntries.length > 0) {
+      migratedActiveId = migratedEntries[0].id;
+    }
+
+    return { entries: migratedEntries, activeEntryId: migratedActiveId };
+  }
+
+  function normalizeEntry(e) {
+    if (!e || typeof e.token !== 'string' || !e.token) return null;
+    return {
+      id: typeof e.id === 'string' && e.id ? e.id : generateId(),
+      description: typeof e.description === 'string' ? e.description : '',
+      token: e.token,
+      expiresAt: typeof e.expiresAt === 'string' ? e.expiresAt : '',
+      repo: typeof e.repo === 'string' ? e.repo : '',
+      branch: typeof e.branch === 'string' ? e.branch : '',
     };
   }
 
@@ -232,74 +233,90 @@
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
       return crypto.randomUUID();
     }
-    return `pat_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    return `entry_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   }
 
   function persistSettings() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        pats,
-        activePatId,
-        coordinates: savedCoordinates,
-        activeCoordinate,
+        entries,
+        activeEntryId,
       }));
     } catch (_) { /* quota exceeded, nothing to do */ }
   }
 
-  function getActivePat() {
-    return pats.find((p) => p.id === activePatId) || null;
+  function getActiveEntry() {
+    return entries.find((e) => e.id === activeEntryId) || null;
   }
 
-  function isPatExpired(pat) {
-    if (!pat || !pat.expiresAt) return false;
+  function isEntryExpired(entry) {
+    if (!entry || !entry.expiresAt) return false;
     const today = new Date().toISOString().slice(0, 10);
-    return pat.expiresAt < today;
+    return entry.expiresAt < today;
   }
 
-  function setupPatDialog() {
-    patDisplayEl.addEventListener('click', () => {
-      patDialogSelectedId = activePatId;
-      hidePatEditForm();
-      renderPatList();
-      patDialog.showModal();
+  function entryHasCoordinate(entry) {
+    return !!(entry && entry.repo && entry.branch);
+  }
+
+  function setupEntriesDialog() {
+    entryDisplayEl.addEventListener('click', () => {
+      dialogSelectedId = activeEntryId;
+      hideEntryEditForm();
+      renderEntriesList();
+      entriesDialog.showModal();
     });
 
-    patDialogCancelBtn.addEventListener('click', () => {
-      patDialog.close();
+    entriesCancelBtn.addEventListener('click', () => {
+      entriesDialog.close();
     });
 
-    patDialogConfirmBtn.addEventListener('click', () => {
-      if (patDialogSelectedId && pats.some((p) => p.id === patDialogSelectedId)) {
-        activePatId = patDialogSelectedId;
+    entriesConfirmBtn.addEventListener('click', () => {
+      if (dialogSelectedId && entries.some((e) => e.id === dialogSelectedId)) {
+        activeEntryId = dialogSelectedId;
         persistSettings();
-        updatePatDisplay();
+        updateEntryDisplay();
       }
-      patDialog.close();
+      entriesDialog.close();
     });
 
-    patAddNewBtn.addEventListener('click', () => {
-      showPatEditForm(null);
+    entryAddNewBtn.addEventListener('click', () => {
+      showEntryEditForm(null);
     });
 
-    patEditCancelBtn.addEventListener('click', () => {
-      hidePatEditForm();
-      renderPatList();
+    entryEditCancelBtn.addEventListener('click', () => {
+      hideEntryEditForm();
+      renderEntriesList();
     });
 
-    patEditSaveBtn.addEventListener('click', () => {
-      const desc = patEditDescEl.value.trim();
-      const token = patEditTokenEl.value.trim();
-      const expiresAt = patEditExpiresEl.value;
+    entryEditSaveBtn.addEventListener('click', () => {
+      const desc = entryEditDescEl.value.trim();
+      const token = entryEditTokenEl.value.trim();
+      const expiresAt = entryEditExpiresEl.value;
+      const coordText = entryEditCoordEl.value.trim();
       if (!token) {
-        patEditTokenEl.focus();
+        entryEditTokenEl.focus();
         return;
       }
-      if (patEditingId) {
-        const existing = pats.find((p) => p.id === patEditingId);
+      let repo = '';
+      let branch = '';
+      if (coordText) {
+        const parsed = parseCoordinate(coordText);
+        if (!parsed) {
+          entryEditCoordEl.focus();
+          return;
+        }
+        repo = parsed.repo;
+        branch = parsed.branch;
+      }
+      if (editingId) {
+        const existing = entries.find((e) => e.id === editingId);
         if (existing) {
           existing.description = desc;
           existing.token = token;
           existing.expiresAt = expiresAt;
+          existing.repo = repo;
+          existing.branch = branch;
         }
       } else {
         const created = {
@@ -307,139 +324,153 @@
           description: desc,
           token,
           expiresAt,
+          repo,
+          branch,
         };
-        pats.push(created);
-        if (!activePatId) {
-          activePatId = created.id;
-          patDialogSelectedId = created.id;
+        entries.push(created);
+        if (!activeEntryId) {
+          activeEntryId = created.id;
+          dialogSelectedId = created.id;
         }
       }
       persistSettings();
-      updatePatDisplay();
-      hidePatEditForm();
-      renderPatList();
+      updateEntryDisplay();
+      hideEntryEditForm();
+      renderEntriesList();
     });
 
-    patListEl.addEventListener('click', (ev) => {
-      const editBtn = ev.target.closest('.pat-edit');
+    entriesListEl.addEventListener('click', (ev) => {
+      const editBtn = ev.target.closest('.entry-edit');
       if (editBtn) {
-        showPatEditForm(editBtn.dataset.id);
+        showEntryEditForm(editBtn.dataset.id);
         return;
       }
-      const delBtn = ev.target.closest('.pat-delete');
+      const delBtn = ev.target.closest('.entry-delete');
       if (delBtn) {
         const id = delBtn.dataset.id;
-        const idx = pats.findIndex((p) => p.id === id);
+        const idx = entries.findIndex((e) => e.id === id);
         if (idx < 0) return;
-        pats.splice(idx, 1);
-        if (activePatId === id) activePatId = null;
-        if (patDialogSelectedId === id) patDialogSelectedId = activePatId;
+        entries.splice(idx, 1);
+        if (activeEntryId === id) activeEntryId = null;
+        if (dialogSelectedId === id) dialogSelectedId = activeEntryId;
         persistSettings();
-        updatePatDisplay();
-        renderPatList();
+        updateEntryDisplay();
+        renderEntriesList();
         return;
       }
-      const pickBtn = ev.target.closest('.pat-pick');
+      const pickBtn = ev.target.closest('.entry-pick');
       if (pickBtn) {
-        patDialogSelectedId = pickBtn.dataset.id;
-        renderPatList();
+        dialogSelectedId = pickBtn.dataset.id;
+        renderEntriesList();
       }
     });
   }
 
-  function showPatEditForm(id) {
-    patEditingId = id;
+  function showEntryEditForm(id) {
+    editingId = id;
     if (id) {
-      const pat = pats.find((p) => p.id === id);
-      if (!pat) return;
-      patEditTitleEl.textContent = 'Edit PAT';
-      patEditDescEl.value = pat.description;
-      patEditTokenEl.value = pat.token;
-      patEditExpiresEl.value = pat.expiresAt || '';
+      const entry = entries.find((e) => e.id === id);
+      if (!entry) return;
+      entryEditTitleEl.textContent = 'Edit entry';
+      entryEditDescEl.value = entry.description;
+      entryEditTokenEl.value = entry.token;
+      entryEditExpiresEl.value = entry.expiresAt || '';
+      entryEditCoordEl.value = entryHasCoordinate(entry) ? `${entry.repo}:${entry.branch}` : '';
     } else {
-      patEditTitleEl.textContent = 'New PAT';
-      patEditDescEl.value = '';
-      patEditTokenEl.value = '';
-      patEditExpiresEl.value = '';
+      entryEditTitleEl.textContent = 'New entry';
+      entryEditDescEl.value = '';
+      entryEditTokenEl.value = '';
+      entryEditExpiresEl.value = '';
+      entryEditCoordEl.value = '';
     }
-    patListEl.hidden = true;
-    patListEmptyEl.hidden = true;
-    patAddNewBtn.hidden = true;
-    patMainActionsEl.hidden = true;
-    patEditFormEl.hidden = false;
+    entriesListEl.hidden = true;
+    entriesEmptyEl.hidden = true;
+    entryAddNewBtn.hidden = true;
+    entryMainActionsEl.hidden = true;
+    entryEditFormEl.hidden = false;
   }
 
-  function hidePatEditForm() {
-    patEditingId = null;
-    patEditFormEl.hidden = true;
-    patAddNewBtn.hidden = false;
-    patMainActionsEl.hidden = false;
+  function hideEntryEditForm() {
+    editingId = null;
+    entryEditFormEl.hidden = true;
+    entryAddNewBtn.hidden = false;
+    entryMainActionsEl.hidden = false;
   }
 
-  function renderPatList() {
-    patListEl.replaceChildren();
-    if (pats.length === 0) {
-      patListEmptyEl.hidden = false;
-      patListEl.hidden = true;
-      patDialogConfirmBtn.disabled = true;
+  function renderEntriesList() {
+    entriesListEl.replaceChildren();
+    if (entries.length === 0) {
+      entriesEmptyEl.hidden = false;
+      entriesListEl.hidden = true;
+      entriesConfirmBtn.disabled = true;
       return;
     }
-    patListEmptyEl.hidden = true;
-    patListEl.hidden = false;
+    entriesEmptyEl.hidden = true;
+    entriesListEl.hidden = false;
 
-    pats.forEach((pat) => {
+    entries.forEach((entry) => {
       const li = document.createElement('li');
       const pick = document.createElement('button');
       pick.type = 'button';
-      pick.className = 'pat-pick';
-      pick.dataset.id = pat.id;
+      pick.className = 'entry-pick';
+      pick.dataset.id = entry.id;
 
       const desc = document.createElement('span');
-      desc.className = 'pat-pick-desc';
-      desc.textContent = pat.description || '(no notes)';
-      if (!pat.description) desc.classList.add('is-empty');
+      desc.className = 'entry-pick-desc';
+      desc.textContent = entry.description || '(no notes)';
+      if (!entry.description) desc.classList.add('is-empty');
       pick.appendChild(desc);
 
-      if (pat.id === activePatId) {
+      const coord = document.createElement('span');
+      coord.className = 'entry-pick-coord';
+      if (entryHasCoordinate(entry)) {
+        coord.textContent = `${entry.repo}:${entry.branch}`;
+      } else {
+        coord.textContent = '(no coordinate)';
+        coord.classList.add('is-empty');
+      }
+      pick.appendChild(coord);
+
+      if (entry.id === activeEntryId) {
         const activeTag = document.createElement('span');
-        activeTag.className = 'pat-pick-active';
+        activeTag.className = 'entry-pick-active';
         activeTag.textContent = '(active)';
         pick.appendChild(activeTag);
       }
 
-      if (isPatExpired(pat)) {
+      if (isEntryExpired(entry)) {
         const expTag = document.createElement('span');
-        expTag.className = 'pat-pick-expired';
+        expTag.className = 'entry-pick-expired';
         expTag.textContent = '(expired)';
         pick.appendChild(expTag);
       }
 
-      if (pat.id === patDialogSelectedId) pick.classList.add('is-selected');
+      if (entry.id === dialogSelectedId) pick.classList.add('is-selected');
 
       const edit = document.createElement('button');
       edit.type = 'button';
-      edit.className = 'pat-edit';
-      edit.dataset.id = pat.id;
-      edit.setAttribute('aria-label', `Edit ${pat.description || 'PAT'}`);
+      edit.className = 'entry-edit';
+      edit.dataset.id = entry.id;
+      edit.setAttribute('aria-label', `Edit ${entry.description || 'entry'}`);
       edit.textContent = 'edit';
 
       const del = document.createElement('button');
       del.type = 'button';
-      del.className = 'pat-delete';
-      del.dataset.id = pat.id;
-      del.setAttribute('aria-label', `Remove ${pat.description || 'PAT'}`);
+      del.className = 'entry-delete';
+      del.dataset.id = entry.id;
+      del.setAttribute('aria-label', `Remove ${entry.description || 'entry'}`);
       del.textContent = '×';
 
       li.appendChild(pick);
       li.appendChild(edit);
       li.appendChild(del);
-      patListEl.appendChild(li);
+      entriesListEl.appendChild(li);
     });
 
-    patDialogConfirmBtn.disabled =
-      !patDialogSelectedId
-      || patDialogSelectedId === activePatId
-      || !pats.some((p) => p.id === patDialogSelectedId);
+    entriesConfirmBtn.disabled =
+      !dialogSelectedId
+      || dialogSelectedId === activeEntryId
+      || !entries.some((e) => e.id === dialogSelectedId);
   }
 
   function formatExpiresDate(iso) {
@@ -447,209 +478,43 @@
     return m ? `${m[3]}/${m[2]}/${m[1]}` : iso;
   }
 
-  function updatePatDisplay() {
-    const pat = getActivePat();
-    const expired = isPatExpired(pat);
+  function updateEntryDisplay() {
+    const entry = getActiveEntry();
+    const expired = isEntryExpired(entry);
 
-    patDisplayTextEl.textContent = '';
-    if (!pat) {
-      patDisplayTextEl.append('(no PAT set)');
-      patDisplayEl.classList.add('is-empty');
+    entryDisplayTextEl.textContent = '';
+    if (!entry) {
+      entryDisplayTextEl.append('(no context set)');
+      entryDisplayEl.classList.add('is-empty');
     } else {
-      if (pat.description) {
-        patDisplayTextEl.append(pat.description);
-        patDisplayEl.classList.remove('is-empty');
+      if (entry.description) {
+        entryDisplayTextEl.append(entry.description);
+        entryDisplayEl.classList.remove('is-empty');
       } else {
-        patDisplayTextEl.append('(PAT set, no notes)');
-        patDisplayEl.classList.add('is-empty');
+        entryDisplayTextEl.append('(PAT set, no notes)');
+        entryDisplayEl.classList.add('is-empty');
       }
-      if (pat.expiresAt) {
+
+      const coordEl = document.createElement('span');
+      coordEl.className = 'entry-display-coord';
+      if (entryHasCoordinate(entry)) {
+        coordEl.textContent = `${entry.repo}:${entry.branch}`;
+      } else {
+        coordEl.textContent = '(no coordinate)';
+        coordEl.classList.add('is-empty');
+      }
+      entryDisplayTextEl.append(coordEl);
+
+      if (entry.expiresAt) {
         const expEl = document.createElement('span');
-        expEl.className = 'pat-display-expires';
-        expEl.textContent = formatExpiresDate(pat.expiresAt);
-        patDisplayTextEl.append(expEl);
+        expEl.className = 'entry-display-expires';
+        expEl.textContent = formatExpiresDate(entry.expiresAt);
+        entryDisplayTextEl.append(expEl);
       }
     }
 
-    patFieldEl.classList.toggle('is-expired', expired);
-    patExpiredTagEl.hidden = !expired;
-    updateSubmitState();
-  }
-
-  function setupCoordinatesDialog() {
-    coordDisplayEl.addEventListener('click', () => {
-      coordDialogSelected = activeCoordinate;
-      hideCoordEditForm();
-      renderCoordinatesDialog();
-      coordinatesDialog.showModal();
-    });
-
-    coordinatesCancelBtn.addEventListener('click', () => {
-      coordinatesDialog.close();
-    });
-
-    coordinatesConfirmBtn.addEventListener('click', () => {
-      if (coordDialogSelected && savedCoordinates.includes(coordDialogSelected)) {
-        activeCoordinate = coordDialogSelected;
-        persistSettings();
-        updateCoordinateDisplay();
-      }
-      coordinatesDialog.close();
-    });
-
-    coordAddNewBtn.addEventListener('click', () => {
-      showCoordEditForm(-1);
-    });
-
-    coordEditCancelBtn.addEventListener('click', () => {
-      hideCoordEditForm();
-      renderCoordinatesDialog();
-    });
-
-    coordEditSaveBtn.addEventListener('click', () => {
-      const text = coordEditInputEl.value.trim();
-      if (!parseCoordinate(text)) {
-        coordEditInputEl.focus();
-        return;
-      }
-      if (coordEditingIdx >= 0) {
-        const oldValue = savedCoordinates[coordEditingIdx];
-        savedCoordinates[coordEditingIdx] = text;
-        // Dedupe: drop other occurrences of the new value
-        for (let i = savedCoordinates.length - 1; i >= 0; i--) {
-          if (i !== coordEditingIdx && savedCoordinates[i] === text) {
-            savedCoordinates.splice(i, 1);
-          }
-        }
-        if (activeCoordinate === oldValue) activeCoordinate = text;
-        if (coordDialogSelected === oldValue) coordDialogSelected = text;
-      } else {
-        if (!savedCoordinates.includes(text)) {
-          savedCoordinates.push(text);
-        }
-        if (!activeCoordinate) {
-          activeCoordinate = text;
-          coordDialogSelected = text;
-        }
-      }
-      persistSettings();
-      updateCoordinateDisplay();
-      hideCoordEditForm();
-      renderCoordinatesDialog();
-    });
-
-    coordinatesListEl.addEventListener('click', (ev) => {
-      const editBtn = ev.target.closest('.coord-edit');
-      if (editBtn) {
-        showCoordEditForm(parseInt(editBtn.dataset.index, 10));
-        return;
-      }
-      const delBtn = ev.target.closest('.coord-delete');
-      if (delBtn) {
-        const idx = parseInt(delBtn.dataset.index, 10);
-        const value = savedCoordinates[idx];
-        savedCoordinates.splice(idx, 1);
-        if (activeCoordinate === value) activeCoordinate = null;
-        if (coordDialogSelected === value) coordDialogSelected = activeCoordinate;
-        persistSettings();
-        updateCoordinateDisplay();
-        renderCoordinatesDialog();
-        return;
-      }
-      const pickBtn = ev.target.closest('.coord-pick');
-      if (pickBtn) {
-        coordDialogSelected = savedCoordinates[parseInt(pickBtn.dataset.index, 10)];
-        renderCoordinatesDialog();
-      }
-    });
-  }
-
-  function showCoordEditForm(idx) {
-    coordEditingIdx = idx;
-    if (idx >= 0) {
-      coordEditTitleEl.textContent = 'Edit coordinate';
-      coordEditInputEl.value = savedCoordinates[idx] || '';
-    } else {
-      coordEditTitleEl.textContent = 'New coordinate';
-      coordEditInputEl.value = '';
-    }
-    coordinatesListEl.hidden = true;
-    coordinatesEmptyEl.hidden = true;
-    coordAddNewBtn.hidden = true;
-    coordMainActionsEl.hidden = true;
-    coordEditFormEl.hidden = false;
-  }
-
-  function hideCoordEditForm() {
-    coordEditingIdx = -1;
-    coordEditFormEl.hidden = true;
-    coordAddNewBtn.hidden = false;
-    coordMainActionsEl.hidden = false;
-  }
-
-  function renderCoordinatesDialog() {
-    coordinatesListEl.replaceChildren();
-    if (savedCoordinates.length === 0) {
-      coordinatesEmptyEl.hidden = false;
-      coordinatesListEl.hidden = true;
-      coordinatesConfirmBtn.disabled = true;
-      return;
-    }
-    coordinatesEmptyEl.hidden = true;
-    coordinatesListEl.hidden = false;
-
-    savedCoordinates.forEach((coord, i) => {
-      const li = document.createElement('li');
-
-      const pick = document.createElement('button');
-      pick.type = 'button';
-      pick.className = 'coord-pick';
-      pick.dataset.index = String(i);
-      pick.appendChild(document.createTextNode(coord));
-
-      if (coord === activeCoordinate) {
-        const activeTag = document.createElement('span');
-        activeTag.className = 'coord-pick-active';
-        activeTag.textContent = '(active)';
-        pick.appendChild(activeTag);
-      }
-
-      if (coord === coordDialogSelected) pick.classList.add('is-selected');
-
-      const edit = document.createElement('button');
-      edit.type = 'button';
-      edit.className = 'coord-edit';
-      edit.dataset.index = String(i);
-      edit.setAttribute('aria-label', `Edit ${coord}`);
-      edit.textContent = 'edit';
-
-      const del = document.createElement('button');
-      del.type = 'button';
-      del.className = 'coord-delete';
-      del.dataset.index = String(i);
-      del.setAttribute('aria-label', `Remove ${coord}`);
-      del.textContent = '×';
-
-      li.appendChild(pick);
-      li.appendChild(edit);
-      li.appendChild(del);
-      coordinatesListEl.appendChild(li);
-    });
-
-    coordinatesConfirmBtn.disabled =
-      !coordDialogSelected
-      || coordDialogSelected === activeCoordinate
-      || !savedCoordinates.includes(coordDialogSelected);
-  }
-
-  function updateCoordinateDisplay() {
-    if (activeCoordinate) {
-      coordDisplayTextEl.textContent = activeCoordinate;
-      coordDisplayEl.classList.remove('is-empty');
-    } else {
-      coordDisplayTextEl.textContent = '(no coordinate set)';
-      coordDisplayEl.classList.add('is-empty');
-    }
+    entryFieldEl.classList.toggle('is-expired', expired);
+    entryExpiredTagEl.hidden = !expired;
     updateSubmitState();
   }
 
@@ -665,38 +530,19 @@
     return { repo, branch };
   }
 
-  function toCoordinateString(item) {
-    if (typeof item === 'string') {
-      const trimmed = item.trim();
-      if (!trimmed) return null;
-      // Transitional migration: strings in the old "owner/name@branch" format
-      // (with @ and no :) are converted to "owner/name:branch".
-      if (!trimmed.includes(':') && trimmed.includes('@')) {
-        const at = trimmed.indexOf('@');
-        return trimmed.slice(0, at) + ':' + trimmed.slice(at + 1);
-      }
-      return trimmed;
-    }
-    if (item && typeof item.repo === 'string' && typeof item.branch === 'string') {
-      return `${item.repo}:${item.branch}`;
-    }
-    return null;
-  }
-
   async function onSubmit(ev) {
     ev.preventDefault();
-    const activePat = getActivePat();
-    if (!activePat || !activePat.token.trim()) {
+    const entry = getActiveEntry();
+    if (!entry || !entry.token.trim()) {
       setStatus('failed', 'No GitHub PAT set', 'Click the edit icon to add one.');
+      return;
+    }
+    if (!entryHasCoordinate(entry)) {
+      setStatus('failed', 'No coordinate set on the active entry', 'Edit the entry to add owner/name:branch.');
       return;
     }
     if (!selectedFile) {
       setStatus('failed', 'No patch file selected', 'Drag or pick a .patch file before submitting.');
-      return;
-    }
-    const parsed = parseCoordinate(activeCoordinate || '');
-    if (!parsed) {
-      setStatus('failed', 'No coordinate set', 'Click the edit icon to add one.');
       return;
     }
     setStatus('running', 'Sending request...', '');
@@ -708,11 +554,11 @@
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${activePat.token.trim()}`,
+          Authorization: `Bearer ${entry.token.trim()}`,
         },
         body: JSON.stringify({
-          repo: parsed.repo,
-          branch: parsed.branch,
+          repo: entry.repo,
+          branch: entry.branch,
           patch,
           commitMessage: commitMessageEl.value.trim(),
         }),
@@ -800,8 +646,9 @@
   }
 
   function updateSubmitState() {
-    const missingPat = !getActivePat();
-    const missingCoord = !activeCoordinate;
+    const entry = getActiveEntry();
+    const missingPat = !entry;
+    const missingCoord = !!entry && !entryHasCoordinate(entry);
     const missingMessage = !commitMessageEl.value.trim();
     const missingFile = !selectedFile;
     let reason = '';
@@ -814,8 +661,7 @@
     submitHintEl.textContent = reason;
     submitHintEl.hidden = !reason;
 
-    patDisplayEl.classList.toggle('is-warn', missingPat);
-    coordDisplayEl.classList.toggle('is-warn', missingCoord);
+    entryDisplayEl.classList.toggle('is-warn', missingPat);
     commitMessageEl.classList.toggle('is-warn', missingMessage);
     dropZone.classList.toggle('is-warn', missingFile);
   }

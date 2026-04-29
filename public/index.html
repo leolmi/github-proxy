@@ -28,21 +28,11 @@
     </p>
 
     <form id="patch-form">
-      <div class="pat-field" id="pat-field">
-        <span class="pat-label">GitHub PAT<span id="pat-expired-tag" class="pat-expired-tag" hidden> (expired)</span></span>
-        <button type="button" id="pat-display" class="pat-display is-empty" aria-label="Manage PATs" title="Manage PATs">
-          <span class="pat-display-text">(no PAT set)</span>
-          <svg class="pat-display-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor" />
-          </svg>
-        </button>
-      </div>
-
-      <div class="coord-field" id="coord-field">
-        <span class="coord-label">Coordinate (owner/name:branch)</span>
-        <button type="button" id="coord-display" class="coord-display is-empty" aria-label="Manage coordinates" title="Manage coordinates">
-          <span class="coord-display-text">(no coordinate set)</span>
-          <svg class="coord-display-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+      <div class="entry-field" id="entry-field">
+        <span class="entry-label">Context<span id="entry-expired-tag" class="entry-expired-tag" hidden> (expired)</span></span>
+        <button type="button" id="entry-display" class="entry-display is-empty" aria-label="Manage contexts" title="Manage contexts">
+          <span class="entry-display-text">(no context set)</span>
+          <svg class="entry-display-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor" />
           </svg>
         </button>
@@ -80,63 +70,41 @@
       <pre id="status-detail"></pre>
     </section>
 
-    <dialog id="coordinates-dialog">
-      <h2>Coordinates</h2>
-
-      <p id="coordinates-empty" hidden>No coordinates saved.</p>
-      <ul id="coordinates-list"></ul>
-
-      <button type="button" id="coord-add-new">+ Add new</button>
-
-      <div id="coord-edit-form" hidden>
-        <h3 id="coord-edit-title">New coordinate</h3>
-        <label>
-          owner/name:branch
-          <input type="text" id="coord-edit-input" placeholder="octocat/hello-world:main" />
-        </label>
-        <div class="dialog-actions">
-          <button type="button" id="coord-edit-cancel">Cancel</button>
-          <button type="button" id="coord-edit-save">Save</button>
-        </div>
-      </div>
-
-      <div class="dialog-actions" id="coord-main-actions">
-        <button type="button" id="coordinates-cancel">Close</button>
-        <button type="button" id="coordinates-confirm" disabled>Set as active</button>
-      </div>
-    </dialog>
-
-    <dialog id="pat-dialog">
+    <dialog id="entries-dialog">
       <h2>GitHub PATs</h2>
 
-      <p id="pat-list-empty" hidden>No PATs saved.</p>
-      <ul id="pat-list"></ul>
+      <p id="entries-empty" hidden>No entries saved.</p>
+      <ul id="entries-list"></ul>
 
-      <button type="button" id="pat-add-new">+ Add new</button>
+      <button type="button" id="entry-add-new">+ Add new</button>
 
-      <div id="pat-edit-form" hidden>
-        <h3 id="pat-edit-title">New PAT</h3>
+      <div id="entry-edit-form" hidden>
+        <h3 id="entry-edit-title">New entry</h3>
         <label>
           Description (memo, not sent anywhere)
-          <input type="text" id="pat-dialog-description" placeholder="e.g. project-name" />
+          <input type="text" id="entry-edit-description" placeholder="e.g. project-name" />
         </label>
         <label>
           Token
-          <input type="password" id="pat-dialog-token" autocomplete="off" />
+          <input type="password" id="entry-edit-token" autocomplete="off" />
         </label>
         <label>
           Expires (blank = never)
-          <input type="date" id="pat-dialog-expires" />
+          <input type="date" id="entry-edit-expires" />
+        </label>
+        <label>
+          Coordinate (owner/name:branch)
+          <input type="text" id="entry-edit-coord" placeholder="octocat/hello-world:main" />
         </label>
         <div class="dialog-actions">
-          <button type="button" id="pat-edit-cancel">Cancel</button>
-          <button type="button" id="pat-edit-save">Save</button>
+          <button type="button" id="entry-edit-cancel">Cancel</button>
+          <button type="button" id="entry-edit-save">Save</button>
         </div>
       </div>
 
-      <div class="dialog-actions" id="pat-main-actions">
-        <button type="button" id="pat-dialog-cancel">Close</button>
-        <button type="button" id="pat-dialog-confirm" disabled>Set as active</button>
+      <div class="dialog-actions" id="entry-main-actions">
+        <button type="button" id="entries-cancel">Close</button>
+        <button type="button" id="entries-confirm" disabled>Set as active</button>
       </div>
     </dialog>
   </main>
