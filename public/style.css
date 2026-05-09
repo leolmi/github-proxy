@@ -110,6 +110,7 @@ textarea {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: 1.8em;
 }
 
 .entry-display-icon {
@@ -132,7 +133,7 @@ textarea {
   margin-left: 0.5rem;
   opacity: 0.7;
   font-family: ui-monospace, Menlo, Consolas, monospace;
-  font-size: 0.85em;
+  font-size: 0.6em;
 }
 
 .entry-display-coord.is-empty {
@@ -145,6 +146,7 @@ textarea {
   margin-left: 0.5rem;
   opacity: 0.4;
   font-style: normal;
+  font-size: 0.6em;
 }
 
 .entry-field.is-expired > .entry-label,
